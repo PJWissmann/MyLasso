@@ -29,7 +29,7 @@ public class MyLasso {
 	 * - self written utility functions
 	 */
 	
-	// list of variables that describe the dataset and the derived variables while the class was constructed
+	/* ---------- list of variables that describe the dataset and the derived variables while the class was constructed ---------- */
 
 	/**
 	 * centered and standardized response - in most literature called Y
@@ -90,7 +90,7 @@ public class MyLasso {
 	
     
     
-    // list of variables we use to train our lasso model
+    /* ---------- list of variables we use to train our lasso model ---------- */
     
 	// tuning parameter lambda - pre-initialized with 0.05
 	private double lambda = 0.05;
@@ -106,7 +106,7 @@ public class MyLasso {
 	
     
     
-	// list of variables to store the result of our lasso model
+	/* ---------- list of variables to store the result of our lasso model ---------- */
 	
 	// linear coefficient array - this stores our trained model
 	private double[] beta;
@@ -116,7 +116,7 @@ public class MyLasso {
 	
 	
 	
-	// basic and complete constructor
+	/* ---------- basic and complete constructor ---------- */
     /**
      * Basic Constructor. This prepares the class before it can be trained.
      * @param predictor is the predictor matrix of the data set.
@@ -135,8 +135,8 @@ public class MyLasso {
      */
     public MyLasso(double[][] predictor, double[] response, boolean featureCentering, boolean featureStandardization) {
     	
-    	this.dimensionality = predictor[0].length; 			// derive dimensionality
-        this.numberOfObservations = response.length; 		// derive number of observations
+    	this.dimensionality = predictor[0].length; 						// derive dimensionality
+        this.numberOfObservations = response.length; 					// derive number of observations
 
         // response operations
         this.centerOfTheResponse = findCenter(response); 				// set the center of the response vector
@@ -149,7 +149,7 @@ public class MyLasso {
         
         // design matrix operations - flexible if the input is the design matrix or just the predictor matrix
         predictorOrDesignMatrixloop:
-        for (int i=0; i<numberOfObservations; i++) { 		// let's assume that if the 0-th feature of the predictor is 1 for all observations, it is already a design matrix
+        for (int i=0; i<numberOfObservations; i++) { 					// if the 0-th feature of the predictor is 1 for all obs., we assume it's a design matrix
         	if (predictor[i][0] != 1) {
         		this.isAlreadyTheDesignMatrix = false;
         		break predictorOrDesignMatrixloop;
@@ -157,51 +157,51 @@ public class MyLasso {
         }
         if (this.isAlreadyTheDesignMatrix) {
         	this.designMatrix = new double[numberOfObservations][dimensionality];
-        	for (int i=0; i<numberOfObservations; i++) { 	// loop over observations
-				for (int j=0; j<dimensionality; j++) { 		// loop over feature
+        	for (int i=0; i<numberOfObservations; i++) { 				// loop over observations
+				for (int j=0; j<dimensionality; j++) { 					// loop over feature
 					designMatrix[i][j] = predictor[i][j];
 				}
         	}
         } else {
         	dimensionality++;
         	this.designMatrix = new double[numberOfObservations][dimensionality];
-        	for (int i=0; i<numberOfObservations; i++) { 	// loop over observations
+        	for (int i=0; i<numberOfObservations; i++) { 				// loop over observations
         		designMatrix[i][0] = 1.0;
-				for (int j=1; j<dimensionality; j++) { 		// loop over feature
+				for (int j=1; j<dimensionality; j++) { 					// loop over feature
 					designMatrix[i][j] = predictor[i][j-1];
 				}
         	}
         }
-        if (this.featureCentering) { 								// if featureCentering is true, then we center the feature vectors
+        if (this.featureCentering) { 									// if featureCentering is true, then we center the feature vectors
         	this.centerVectorOfTheDesignMatrix = new double[dimensionality];
         	for (int j=1; j<dimensionality; j++) {
         		double[] helpVector = new double[numberOfObservations];
-        		for (int i=0; i<numberOfObservations; i++) { 		// we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
-        			helpVector[i] = designMatrix[i][j];
+        		for (int i=0; i<numberOfObservations; i++) { 			// we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
+        			helpVector[i] = designMatrix[i][j];																								// extract vector
         		}
         		centerVectorOfTheDesignMatrix[j] = findCenter(helpVector); 
-        		for (int i=0; i<numberOfObservations; i++) { 		// centers the j-th feature vector
+        		for (int i=0; i<numberOfObservations; i++) { 			// centers the j-th feature vector
         			designMatrix[i][j] = designMatrix[i][j] - centerVectorOfTheDesignMatrix[j];
         		}
         	}
         }
-        if (this.featureStandardization) { 							// if featureCentering is true, then we center the feature vectors
+        if (this.featureStandardization) { 								// if featureStandardization is true, then we center the feature vectors
         	this.scalingVectorOfTheDesignMatrix = new double[dimensionality];
         	for (int j=1; j<dimensionality; j++) {
         		double[] helpVector = new double[numberOfObservations];
-        		for (int i=0; i<numberOfObservations; i++) { 		// we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
-        			helpVector[i] = designMatrix[i][j];
+        		for (int i=0; i<numberOfObservations; i++) { 			// we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
+        			helpVector[i] = designMatrix[i][j];																								// extract vector
         		}
         		scalingVectorOfTheDesignMatrix[j] = findStandardizationFactor(helpVector); 
-        		for (int i=0; i<numberOfObservations; i++) { 		// centers the j-th feature vector
+        		for (int i=0; i<numberOfObservations; i++) { 			// centers the j-th feature vector
         			designMatrix[i][j] = designMatrix[i][j] / scalingVectorOfTheDesignMatrix[j];
         		}
         	}
         }
         
         
-        beta = new double[dimensionality]; 					// initialize beta vector
-        residual = new double[numberOfObservations]; 		// initialize residual vector
+        beta = new double[dimensionality]; 								// initialize beta vector
+        residual = new double[numberOfObservations]; 					// initialize residual vector
         
         System.out.println("Which algorithm do you want to use to train Lasso?"); 
         System.out.println("You can use the methods trainSubgradient(), trainCycleCoord() or trainGreedyCoord()");
@@ -214,7 +214,7 @@ public class MyLasso {
     }
     
     
-	// setter and getter methods for variables we use to train our lasso model
+	/* ---------- setter and getter methods for variables we use to train our lasso model ---------- */
 	/**
 	 * setter for the parameter lambda
 	 * @param lambda as a double
@@ -237,7 +237,7 @@ public class MyLasso {
 	
 	/**
 	 * setter for the parameter learningRate
-	 * @param learningRate is the (double) learningRate 
+	 * @param learningRate as a double
 	 */
 	public void setLearningRate(double learningRate) {
 		if (learningRate < 0) //throw new exception; // HERE COULD land a fitting exception
@@ -287,7 +287,7 @@ public class MyLasso {
 	}
 	
 	
-	// CV setter for lambda 
+	/* ---------- CV setter for lambda ---------- */
     /**
      * Method that uses K-fold Cross Validation to find a suitable lambda from a predefined lambda grid.
      * @param seed 
@@ -309,8 +309,8 @@ public class MyLasso {
     	List<Integer> indexList = Arrays.asList(indexArray);
     	Collections.shuffle(indexList, rng);
     	indexList.toArray(indexArray);
-    	double[][] cvXcomplete = new double[numberOfObservations][dimensionality]; 		// initialize whole helper
-    	double[] cvYcomplete = new double[numberOfObservations]; 						// initialize whole helper
+    	double[][] cvXcomplete = new double[numberOfObservations][dimensionality]; 		// initialize whole helper								// extract vector
+    	double[] cvYcomplete = new double[numberOfObservations]; 						// initialize whole helper								// extract vector
     	for(int i=0; i<numberOfObservations; i++) {
     		int iShuffled = indexArray[i];
     		cvXcomplete[i] = designMatrix[iShuffled];
@@ -384,8 +384,7 @@ public class MyLasso {
     }
 	
 	
-	// three different stepwise algorithms to actually train the lasso model
-	
+	/* ---------- three different stepwise algorithms to actually train the lasso model ---------- */	
     /**
 	 * This method uses the simplified assumption that the derivative for the lasso penalty is given by
 	 * the sign(x) function which is one of the subgradients and then implements a gradient descent method.
@@ -400,7 +399,7 @@ public class MyLasso {
 	 * @param learningRate is a factor of the gradient in the update step - low learningRate leads to better convergence, but the algorithm needs more steps to reach the goal
      * @return betaUpdated is a double vector with the trained coefficients for beta
 	 */
-	private double[] trainSubgradient(double[][] designMatrix, double[] response, double lambda, double tolerance, int maxSteps, double learningRate) {
+	public double[] trainSubgradient(double[][] designMatrix, double[] response, double lambda, double tolerance, int maxSteps, double learningRate) {
 		int m = response.length;
 		int n = designMatrix[0].length;
 		double[] betaInTraining = new double[n];
@@ -411,17 +410,17 @@ public class MyLasso {
 		System.out.println("Training via batch gradient descent in progress. Please wait...");
 		// first calculate the error
 		trainStepLoop:
-		for (; timeStep <maxSteps; timeStep++) { // loop over steps
-			for (int i=0; i<m; i++) { // loop over errors
+		for (; timeStep <maxSteps; timeStep++) { 				// loop over steps																				// product
+			for (int i=0; i<m; i++) { 							// loop over errors
 				residualInTraining[i] = response[i];
 				for (int j=0; j<n; j++) { 
 					residualInTraining[i] -= designMatrix[i][j] * betaInTraining[j];
 				}
 			}
 			
-			for (int j=0; j<n; j++) { // loop over beta updates
+			for (int j=0; j<n; j++) { 							// loop over beta updates																		// product
 				double gradient;
-				if (j==0) {gradient = 0.0;} else if (betaInTraining[j]<0) {gradient = lambda;} else {gradient = - lambda;}; // here is the subgradient instead of the gradient
+				if (j==0) {gradient = 0.0;} else if (betaInTraining[j]<0) {gradient = lambda;} else {gradient = - lambda;}; 	// here is the subgradient instead of the gradient
 				for (int i=0; i<m; i++) { 
 					gradient += residualInTraining[i] * designMatrix[i][j];
 				}
@@ -433,7 +432,7 @@ public class MyLasso {
 //			System.out.println();
 
 			checkMovementLoop:
-			for (int j=0; j<n; j++) { // loop that stops the whole training if no beta coefficients moved more than the tolerance
+			for (int j=0; j<n; j++) { 							// loop that stops the whole training if no beta coefficients moved more than the tolerance
 				if (Math.abs(betaUpdated[j] - betaInTraining[j]) > tolerance) {
 					break checkMovementLoop;
 				}
@@ -444,7 +443,7 @@ public class MyLasso {
 				}
 			}
 			
-			betaInTraining = betaUpdated.clone(); // now to reset the trainStepLoop
+			betaInTraining = betaUpdated.clone(); 				// now to reset the trainStepLoop
 		}
 		if (timeStep < maxSteps) {
 			System.out.println("You reached your destination after " + timeStep + " steps. Congrats.");
@@ -467,7 +466,7 @@ public class MyLasso {
 	 * @param learningRate is a factor of the gradient in the update step - low learningRate leads to better convergence, but the algorithm needs more steps to reach the goal
 	 * @return betaUpdated is a double vector with the trained coefficients for beta
 	 */
-	private double[] trainCycleCoord(double[][] designMatrix, double[] response, double lambda, double tolerance, int maxSteps, double learningRate) {
+	public double[] trainCycleCoord(double[][] designMatrix, double[] response, double lambda, double tolerance, int maxSteps, double learningRate) {
 		int m = response.length;
 		int n = designMatrix[0].length;
 		double[] betaInTraining = new double[n];
@@ -478,33 +477,33 @@ public class MyLasso {
 		
 		System.out.println("Training via cyclic coordinate descent in progress. Please wait...");
 		
-		for (int i=0; i<m; i++) { // compute the start residuals
+		for (int i=0; i<m; i++) { 								// compute the start residuals
 			residualInTraining[i] = response[i];
 		}
-		for (int j=1; j<n; j++) { // compute the squardSumOfPredictors - note that we ignore j=0 since the intercept has another update formula
+		for (int j=1; j<n; j++) { 								// compute the squardSumOfPredictors - note that we ignore j=0 since the intercept has another update formula
 			for (int i=0; i<m; i++) {
 				squaredSumOfJPredictors[j] += designMatrix[i][j] * designMatrix[i][j];
 			}
 		}
 		
 		trainStepLoop:
-		for (; timeStep < maxSteps; timeStep++) { // loop over steps
+		for (; timeStep < maxSteps; timeStep++) { 				// loop over steps
 
-			for (int j=0; j<n; j++) { // loop over beta updates
-				if (j==0) { // update the intercept
-					double interceptDerivative = 0; // parameter that computes the negative sum of the residuals
+			for (int j=0; j<n; j++) { 							// loop over beta updates
+				if (j==0) { 									// update the intercept
+					double interceptDerivative = 0; 			// parameter that computes the negative sum of the residuals
 					for (int i=0; i<m; i++) { //
 						interceptDerivative -= residualInTraining[i];
 					}
 					betaUpdated[0] = betaInTraining[0] - learningRate / m * interceptDerivative; 
 					// System.out.println("Updated beta0 from "+ betaInTraining[0] + " to " + betaUpdated[0]);
 					
-					for (int i=0; i<m; i++) { // update the residuals
+					for (int i=0; i<m; i++) { 					// update the residuals
 						residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);
 					}
 				}
 				else {
-					double betajOLSDerivative = 0; // parameter that computes the negative sum of the residuals times the x_(.j)
+					double betajOLSDerivative = 0; 				// parameter that computes the negative sum of the residuals times the x_(.j)
 					
 					for (int i=0; i<m; i++) { //
 						betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j];
@@ -512,7 +511,7 @@ public class MyLasso {
 					betaUpdated[j] = Math.min(0, betaInTraining[j] - (betajOLSDerivative - lambda)/ squaredSumOfJPredictors[j]) + 
 							Math.max(0, betaInTraining[j] - (betajOLSDerivative + lambda)/ squaredSumOfJPredictors[j]);
 					// System.out.println("Updated beta"+j+" from "+ betaInTraining[j] + " to " + betaUpdated[j]);
-					for (int i=0; i<m; i++) { // update the residuals
+					for (int i=0; i<m; i++) { 					// update the residuals
 						residualInTraining[i] += designMatrix[i][j] * (betaInTraining[j]  - betaUpdated[j]);
 					}
 				}
@@ -524,7 +523,7 @@ public class MyLasso {
 //			System.out.println();
 			
 			checkMovementLoop:
-			for (int j=0; j<n; j++) { // loop that stops the whole training if no beta coefficients moved more than the tolerance
+			for (int j=0; j<n; j++) { 							// loop that stops the whole training if no beta coefficients moved more than the tolerance
 				if (Math.abs(betaUpdated[j] - betaInTraining[j]) > tolerance) {
 					break checkMovementLoop;
 				}
@@ -534,7 +533,7 @@ public class MyLasso {
 				}
 			}
 			
-			betaInTraining = betaUpdated.clone(); // now to reset the loop
+			betaInTraining = betaUpdated.clone(); 				// now to reset the trainStepLoop
 			
 		}
 		
@@ -559,7 +558,7 @@ public class MyLasso {
 	 * @param learningRate is a factor of the gradient in the update step - low learningRate leads to better convergence, but the algorithm needs more steps to reach the goal
 	 * @return betaUpdated is a double vector with the trained coefficients for beta
 	 */
-	private double[] trainGreedyCoord(double[][] designMatrix, double[] response, double lambda, double tolerance, int maxSteps, double learningRate) {
+	public double[] trainGreedyCoord(double[][] designMatrix, double[] response, double lambda, double tolerance, int maxSteps, double learningRate) {
 		int m = response.length;
 		int n = designMatrix[0].length;
 		double[] betaInTraining = new double[n];
@@ -570,34 +569,34 @@ public class MyLasso {
 		
 		System.out.println("Training via greedy coordinate descent in progress. Please wait...");
 		
-		for (int i=0; i<m; i++) { // compute the start residuals
+		for (int i=0; i<m; i++) { 								// compute the start residuals
 			residualInTraining[i] = response[i];
 		}
-		for (int j=1; j<n; j++) { // compute the squaredSumOfPredictors - note this is only relevant if the data is not standardized, otherwise this should equal 1
+		for (int j=1; j<n; j++) { 								// compute the squaredSumOfPredictors - note this is only relevant if the data is not standardized, otherwise this should equal 1
 			for (int i=0; i<m; i++) {
 				squaredSumOfJPredictors[j] += designMatrix[i][j] * designMatrix[i][j];
 			}
 		}
 		
 		trainStepLoop:
-		for (; timeStep <maxSteps; timeStep++) { // loop over steps
+		for (; timeStep <maxSteps; timeStep++) { 				// loop over steps
 
-			double interceptDerivative = 0; // first let's look at the intercept derivative
+			double interceptDerivative = 0; 					// first let's look at the intercept derivative
 			for (int i=0; i<m; i++) { //
 				interceptDerivative -= residualInTraining[i];
 			}
-			double steepDerivative = interceptDerivative; // this value remembers the steepest descent, we initialize it with the intercept derivative
-			int steepCoeff = 0; // this is the coefficient that identifies the steepest descent
+			double steepDerivative = interceptDerivative; 		// this value remembers the steepest descent, we initialize it with the intercept derivative
+			int steepCoeff = 0; 								// this is the coefficient that identifies the steepest descent
 			boolean isBackwardDerivative = false;
 			// System.out.println("steepDer is " + steepDerivative + " at beta" + steepCoeff); 
-			for (int j=1; j<n; j++) { // search for the steepest descent - we start at j=1 because we already computed the intercept thingy
-				double betajOLSDerivative = 0; // let's compute the derivative to compare
+			for (int j=1; j<n; j++) { 							// search for the steepest descent - we start at j=1 because we already computed the intercept thingy
+				double betajOLSDerivative = 0; 					// let's compute the derivative to compare
 				for (int i=0; i<m; i++) { //
 					betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j];
 				}
 				
 				double forwardDerivative = betajOLSDerivative;
-				if (betaInTraining[j] >= 0) { // here we build the directional derivatives that we want to compare depending on the sign of the coefficient ....
+				if (betaInTraining[j] >= 0) { 					// here we build the directional derivatives that we want to compare depending on the sign of the coefficient ....
 					forwardDerivative += lambda;
 				} else {
 					forwardDerivative -= lambda;
@@ -609,11 +608,11 @@ public class MyLasso {
 					backwardDerivative += lambda;
 				}
 				
-				if (forwardDerivative < steepDerivative) { // let's find out if we actually found a steeper descent
+				if (forwardDerivative < steepDerivative) { 		// let's find out if we actually found a steeper descent
 					steepDerivative = forwardDerivative;
 					steepCoeff = j;
 					isBackwardDerivative = false;
-				} else if (backwardDerivative < steepDerivative) { // since our objective we want to minimize is convex utmost one of these conditions can be true
+				} else if (backwardDerivative < steepDerivative) { 	// since our objective we want to minimize is convex utmost one of these conditions can be true
 					steepDerivative = backwardDerivative;
 					steepCoeff = j;
 					isBackwardDerivative = true;
@@ -624,16 +623,16 @@ public class MyLasso {
 			// now that we found the steepest descent, we should check if it's really negative
 			if (steepDerivative >= 0) break trainStepLoop;
 			
-			if (steepCoeff == 0) { // update the intercept
+			if (steepCoeff == 0) { 								// update the intercept
 				betaUpdated[0] = betaInTraining[0] - learningRate / m * steepDerivative; 
-				for (int i=0; i<m; i++) { // update the residuals
+				for (int i=0; i<m; i++) { 						// update the residuals
 					residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);
 				}
-			} else { // or update another coefficient
+			} else { 											// or update another coefficient
 				if (isBackwardDerivative) steepDerivative = - steepDerivative;
 				betaUpdated[steepCoeff] = Math.min(0, betaInTraining[steepCoeff] - (steepDerivative)/ squaredSumOfJPredictors[steepCoeff]) + 
 					Math.max(0, betaInTraining[steepCoeff] - (steepDerivative)/ squaredSumOfJPredictors[steepCoeff]);
-				for (int i=0; i<m; i++) { // update the residuals
+				for (int i=0; i<m; i++) { 						// update the residuals
 					residualInTraining[i] += designMatrix[i][steepCoeff] * (betaInTraining[steepCoeff]  - betaUpdated[steepCoeff]);
 				}
 			}
@@ -645,10 +644,10 @@ public class MyLasso {
 			
 			if (Math.abs(betaUpdated[steepCoeff] - betaInTraining[steepCoeff]) < tolerance) {
 				timeStep++;
-				break trainStepLoop; // stops training if the update was smaller than the tolerance
+				break trainStepLoop; 							// stops training if the update was smaller than the tolerance
 			}
 			
-			betaInTraining = betaUpdated.clone(); // now to reset the loop
+			betaInTraining = betaUpdated.clone(); 				// now to reset the trainStepLoop
 		}
 		
 		if (timeStep < maxSteps) {
@@ -660,10 +659,8 @@ public class MyLasso {
 	}
 
 	
-	/* quality of life chapter - here are methods collected to easily access the trained model (beta and residuals)
-	 * as well use the model to predict a response for a new observation etc.
-	 */
-	
+	/* ---------- quality of life chapter ---------- */
+	// here are methods collected to easily access the trained model (beta and residuals) as well use the model to predict a response for a new observation etc.	
 	/**
 	 * @return coefficient array beta 
 	 */
@@ -744,7 +741,7 @@ public class MyLasso {
 	 * @return predictRetransformed(x)
 	 */
 	public double predictRetransformedNewObs(double[] x) {
-		if (x.length != beta.length) 						//throw some kind of exception?
+		if (x.length != beta.length) 						// throw some kind of exception?
 		if (featureCentering) { 							// if featureCentering is true, then we center the the new observation
         	for (int j=1; j<dimensionality; j++) {
         		x[j] = x[j] - centerVectorOfTheDesignMatrix[j];
@@ -814,9 +811,10 @@ public class MyLasso {
 		return lossValue;
 	}
 	
-	// wrapper classes around the algorithms that show the computation time and update the residual with the new model
+	/* ---------- wrapper classes around the algorithms that show the computation time and update the residual with the new model ---------- */
 	/**
 	 * Public method of the simplified gradient descent method that uses the set parameters to train.
+	 * The currently set parameters are used for training. More details are given in the method with arguments.
 	 */
 	public void trainSubgradient() {
 		long startTimeStamp = System.nanoTime();
@@ -828,6 +826,7 @@ public class MyLasso {
 	
 	/**
 	 * Public method of the simplified gradient descent method that uses the set parameters to train.
+	 * The currently set parameters are used for training. More details are given in the method with arguments.
 	 */
 	public void trainCycleCoord() {
 		long startTimeStamp = System.nanoTime();
@@ -839,6 +838,7 @@ public class MyLasso {
 	
 	/**
 	 * Public method of the simplified gradient descent method that uses the set parameters to train.
+	 * The currently set parameters are used for training. More details are given in the method with arguments.
 	 */
 	public void trainGreedyCoord() {
 		long startTimeStamp = System.nanoTime();
@@ -849,8 +849,7 @@ public class MyLasso {
 	}
 	
 
-	// self written utility functions used mainly in the constructor
-	
+	/* ---------- self written utility functions used mainly in the constructor ---------- */
     /**
      * method to find the center of a given vector via Kahan summation
      * @param originalVector
