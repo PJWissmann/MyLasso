@@ -16,7 +16,7 @@ public class MyLasso {
 
 	// list of variables the dataset has
 	
-	/**
+	/*
 	 * dimensionality of the predictors
 	 */
 	private int dimensionality;
