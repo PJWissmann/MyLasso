@@ -1,5 +1,5 @@
 /**
- * 
+ * For what exactly is this space used?
  */
 package com.philippwissmann.lassolearning;
 
@@ -9,313 +9,382 @@ import java.util.List;
 import java.util.Random;
 
 /**
+ * Class constructed for a given dataset to train a lasso model.
+ * 
  * @author Philipp Wissmann
- *
  */
 public class MyLasso {
 
-	// list of variables the dataset has
-	
 	/*
-	 * dimensionality of the predictors
+	 * Overview to understand the code:
+	 * - list of variables that describe the dataset
+	 * - list of variables we use to train our lasso model
+	 * - list of variables to store the result of our lasso model
+	 * - basic and complete constructor
+	 * - setter and getter methods for variables we use to train our lasso model
+	 * - CV setter for lambda
+	 * - three different stepwise algorithms to actually train the lasso model
+	 * - quality of life methods
+	 * - wrapper classes around the algorithms
+	 * - self written utility functions
 	 */
-	private int dimensionality;
+	
+	// list of variables that describe the dataset and the derived variables while the class was constructed
+
+	/**
+	 * centered and standardized response - in most literature called Y
+	 * is derived in the constructor
+	 */
+	public double[] centeredScaledResponse;
 	
 	/**
-	 * number of observations
+	 * design matrix version of the predictor - in most literature called X
+	 * can be centered and/or scaled depending on how the class was constructed
+	 * is derived in the constructor
 	 */
+	public double[][] designMatrix;
+	
+	/**
+	 * boolean if the features are centered - can be chosen in the constructor
+	 * usually true so the lasso penalizes not the intercept
+	 */
+	public boolean featureCentering = true;
+	
+	/**
+	 * boolean if the features are standardized - can be chosen in the constructor
+	 * usually true so the lasso penalty hits predictors independent of their "scale"
+	 */
+	public boolean featureStandardization = true;
+	
+	// dimensionality of the predictors - derived via constructor
+	private int dimensionality;
+	
+	// number of observations - derived via constructor
 	private int numberOfObservations;
 	
 	/**
-	 * center of the response
+	 * center of the response vector - derived via constructor
 	 */
 	public double centerOfTheResponse;
 	
 	/**
-	 * scaling factor of the response
+	 * scaling factor of the response - derived via constructor
 	 */
-	private double scaleOfTheResponse;
+	public double scaleOfTheResponse;
 	
 	/**
-	 * saves the centered and scaled response 
+	 * saves the center vector of the features in the design matrix - derived via constructor if featureCentering is true
 	 */
-	private double[] centeredScaledResponse;
+	public double[] centerVectorOfTheDesignMatrix;
 	
 	/**
-	 * saves the center vector of the features in the design matrix
+	 * saves the scaling vector of the features in the design matrix - derived via constructor if featureStandardization is true
 	 */
-	private double[] centerVectorOfTheDesignMatrix;
+	public double[] scalingVectorOfTheDesignMatrix;
 	
 	/**
-	 * saves the scaling vector of the features in the design matrix
-	 */
-	private double[] scalingVectorOfTheDesignMatrix;
-	
-	/**
-	 * saves the design matrix of the predictor
-	 */
-	private double[][] designMatrix;
-	
-	/**
-	 * saves the boolean if the features are centered
-	 */
-	private boolean featureCentering = true;
-	
-	/**
-	 * saves the boolean if the features are standardized
-	 */
-	private boolean featureStandardization = true;
-	
-	/**
-	 * saves the boolean if the input data is already a design matrix
+	 * boolean if the input data is already a design matrix - derived via constructor
+	 * is responsible to add a "1"-column to the predictor matrix if false
 	 */
     private boolean isAlreadyTheDesignMatrix = true;
 	
-	// list of variables where we store the result of our lasso model
-	
-	/**
-	 * linear coefficient array with a getter method and a printer method as well as a getter for a specific value
-	 */
-	private double[] beta;
-	public double[] getBeta() {
-		return beta;
-	}
-	public void printBeta() {
-		for (int j=0; j<dimensionality; j++) {
-			System.out.println("Beta" + j + ": " + beta[j]);
-		}
-	}
-	public double getSpecificBeta(int j) {
-		return beta[j];
-	}
-	
-	/**
-	 * residual array with a getter method and a printer method as well as a getter for a specific value
-	 */
-	private double[] residual;
-	public double[] getResiduals() {
-		return residual;
-	}
-	public void printResidual() {
-		for (int i=0; i<numberOfObservations; i++) {
-			System.out.println("Residual" + i + ": " + residual[i]);
-		}
-	}
-	public double getSpecificResidual(int i) {
-		return residual[i];
-	}
-	
-	
-	//training specific parameters
-	/**
-	 * tuning parameter lambda
-	 */
+    
+    
+    // list of variables we use to train our lasso model
+    
+	// tuning parameter lambda - pre-initialized with 0.05
 	private double lambda = 0.05;
 	
-	/**
-	 * learning rate 
-	 */
+	// learning rate - pre-initialized with 0.01
 	private double learningRate = 0.01;
 	
-	/**
-	 * tolerance with an initial freely chosen value
-	 */
+	//tolerance - pre-initialized with 0.000001
 	private double tolerance = 0.000001;
 
-	/**
-	 * maximal training steps with an initial freely chosen value
-	 */
+	// maximal training steps - pre-initialized with 5000
 	private int maxSteps = 5000;
 	
+    
+    
+	// list of variables to store the result of our lasso model
 	
-	// setter and getter for training specific parameters
+	// linear coefficient array - this stores our trained model
+	private double[] beta;
+	
+	// residual array - this is computed with the trained model and can be used to evaluate the model
+	private double[] residual;
+	
+	
+	
+	// basic and complete constructor
+    /**
+     * Basic Constructor. This prepares the class before it can be trained.
+     * @param predictor is the predictor matrix of the data set.
+     * @param response is the response vector of the data set.
+     */
+    public MyLasso(double[][] predictor, double[] response) {
+        this(predictor, response, true, true);
+    }
+
+    /**
+     * Complete Constructor. This prepares the class before it can be trained.
+     * @param predictor is the predictor matrix of the data set.
+     * @param response is the response vector of the data set.
+     * @param featureCentering is the boolean to center the predictor.
+     * @param featureStandardization is the boolean to standardize the predictor.
+     */
+    public MyLasso(double[][] predictor, double[] response, boolean featureCentering, boolean featureStandardization) {
+    	
+    	this.dimensionality = predictor[0].length; 			// derive dimensionality
+        this.numberOfObservations = response.length; 		// derive number of observations
+
+        // response operations
+        this.centerOfTheResponse = findCenter(response); 				// set the center of the response vector
+        this.scaleOfTheResponse = findStandardizationFactor(response); 	// set the scale factor of the response vector
+        this.centeredScaledResponse = new double[numberOfObservations];
+        for (int i=0; i<numberOfObservations; i++) { 					// set centered and scaled response vector
+        	centeredScaledResponse[i] = (response[i] - centerOfTheResponse) / scaleOfTheResponse;
+        }
+        
+        
+        // design matrix operations - flexible if the input is the design matrix or just the predictor matrix
+        predictorOrDesignMatrixloop:
+        for (int i=0; i<numberOfObservations; i++) { 		// let's assume that if the 0-th feature of the predictor is 1 for all observations, it is already a design matrix
+        	if (predictor[i][0] != 1) {
+        		this.isAlreadyTheDesignMatrix = false;
+        		break predictorOrDesignMatrixloop;
+        	}
+        }
+        if (this.isAlreadyTheDesignMatrix) {
+        	this.designMatrix = new double[numberOfObservations][dimensionality];
+        	for (int i=0; i<numberOfObservations; i++) { 	// loop over observations
+				for (int j=0; j<dimensionality; j++) { 		// loop over feature
+					designMatrix[i][j] = predictor[i][j];
+				}
+        	}
+        } else {
+        	dimensionality++;
+        	this.designMatrix = new double[numberOfObservations][dimensionality];
+        	for (int i=0; i<numberOfObservations; i++) { 	// loop over observations
+        		designMatrix[i][0] = 1.0;
+				for (int j=1; j<dimensionality; j++) { 		// loop over feature
+					designMatrix[i][j] = predictor[i][j-1];
+				}
+        	}
+        }
+        if (this.featureCentering) { 								// if featureCentering is true, then we center the feature vectors
+        	this.centerVectorOfTheDesignMatrix = new double[dimensionality];
+        	for (int j=1; j<dimensionality; j++) {
+        		double[] helpVector = new double[numberOfObservations];
+        		for (int i=0; i<numberOfObservations; i++) { 		// we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
+        			helpVector[i] = designMatrix[i][j];
+        		}
+        		centerVectorOfTheDesignMatrix[j] = findCenter(helpVector); 
+        		for (int i=0; i<numberOfObservations; i++) { 		// centers the j-th feature vector
+        			designMatrix[i][j] = designMatrix[i][j] - centerVectorOfTheDesignMatrix[j];
+        		}
+        	}
+        }
+        if (this.featureStandardization) { 							// if featureCentering is true, then we center the feature vectors
+        	this.scalingVectorOfTheDesignMatrix = new double[dimensionality];
+        	for (int j=1; j<dimensionality; j++) {
+        		double[] helpVector = new double[numberOfObservations];
+        		for (int i=0; i<numberOfObservations; i++) { 		// we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
+        			helpVector[i] = designMatrix[i][j];
+        		}
+        		scalingVectorOfTheDesignMatrix[j] = findStandardizationFactor(helpVector); 
+        		for (int i=0; i<numberOfObservations; i++) { 		// centers the j-th feature vector
+        			designMatrix[i][j] = designMatrix[i][j] / scalingVectorOfTheDesignMatrix[j];
+        		}
+        	}
+        }
+        
+        
+        beta = new double[dimensionality]; 					// initialize beta vector
+        residual = new double[numberOfObservations]; 		// initialize residual vector
+        
+        System.out.println("Which algorithm do you want to use to train Lasso?"); 
+        System.out.println("You can use the methods trainSubgradient(), trainCycleCoord() or trainGreedyCoord()");
+        System.out.println("");
+        
+    	// System.out.println("dimensionality "+ predictor[0].length);
+        // System.out.println("numberOfObservations " + response.length);
+        // System.out.println("centerResponse " + findCenter(response));
+        // System.out.println("scaleResponse " + findStandardizationFactor(response));
+    }
+    
+    
+	// setter and getter methods for variables we use to train our lasso model
 	/**
-	 * Setter for the tuning parameter lambda.
-	 * @param lambda is the double tuning parameter.
-	 * @return TrainMyLasso with the new lambda.
+	 * setter for the parameter lambda
+	 * @param lambda as a double
 	 */
 	public void setLambda(double lambda) {
 		if (lambda < 0) {
-			//throw new exception; // HERE SHOULD land a fitting exception
+			//throw new exception; // HERE COULD land a fitting exception
 		}
 		this.lambda = lambda;
 	}
+	
+	/**
+	 * getter for the parameter lambda
+	 * @return current set lambda
+	 */
 	public double getLambda() {
 		return lambda;
 	}
 	
+	
 	/**
-	 * Setter for the tuning parameter learning rate.
-	 * @param learningRate is the double learning rate parameter.
-	 * @return TrainMyLasso with the new learning rate.
+	 * setter for the parameter learningRate
+	 * @param learningRate is the (double) learningRate 
 	 */
 	public void setLearningRate(double learningRate) {
-		if (learningRate < 0) //throw new exception; // HERE SHOULD land a fitting exception
+		if (learningRate < 0) //throw new exception; // HERE COULD land a fitting exception
 		this.learningRate = learningRate;
 	}
+	
+	/**
+	 * getter for the parameter learningRate
+	 * @return current set learningRate
+	 */
 	public double getLearningRate() {
 		return learningRate;
 	}
 	
 	
 	/**
-	 * Setter for the tuning parameter tolerance.
-	 * @param tolerance is the double tolerance parameter.
-	 * @return TrainMyLasso with the new tolerance.
+	 * setter for the tuning parameter tolerance
+	 * @param tolerance as a double
 	 */
 	public void setTolerance(double tolerance) {
-		if (tolerance < 0) //throw new exception; // HERE SHOULD land a fitting exception
+		if (tolerance < 0) //throw new exception; // HERE COULD land a fitting exception
 		this.tolerance = tolerance;
 	}
+	
+	/**
+	 * getter for the parameter tolerance
+	 * @return current set tolerance
+	 */
 	public double getTolerance() {
 		return tolerance;
 	}
 	
 	/**
-	 * Setter for the tuning parameter maxSteps.
-	 * @param maxSteps is the int maximum steps parameter.
-	 * @return TrainMyLasso with the new maximum steps.
+	 * setter for the tuning parameter maxStep
+	 * @param maxSteps as an int 
 	 */
 	public void setMaxSteps(int maxSteps) {
-		if (maxSteps < 0) //throw new exception; // HERE SHOULD land a fitting exception
+		if (maxSteps < 0) //throw new exception; // HERE COULD land a fitting exception
 		this.maxSteps = maxSteps;
 	}
+	/**
+	 * getter for the parameter maxSteps
+	 * @return current set maxSteps
+	 */
 	public int getMaxSteps() {
 		return maxSteps;
 	}
 	
-	/**
-	 * Public method of the simplified gradient descent method that uses the set parameters to train.
-	 */
-	public void trainSubgradient() {
-		long startTimeStamp = System.nanoTime();
-		beta = trainSubgradient(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
-		long endTimeStamp = System.nanoTime();
-		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
-		updateResiduals();
-	}
 	
-	
-	/**
-	 * Public method of the simplified gradient descent method that uses the set parameters to train.
-	 */
-	public void trainCycleCoord() {
-		long startTimeStamp = System.nanoTime();
-		beta = trainCycleCoord(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
-		long endTimeStamp = System.nanoTime();
-		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
-		updateResiduals();
-	}
-	
-	/**
-	 * Public method of the simplified gradient descent method that uses the set parameters to train.
-	 */
-	public void trainGreedyCoord() {
-		long startTimeStamp = System.nanoTime();
-		beta = this.trainGreedyCoord(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
-		long endTimeStamp = System.nanoTime();
-		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
-		updateResiduals();
-	}
-	
-	/**
-	 * Private method that updates the residuals after training.
-	 */
-	private void updateResiduals() {
-		for (int i = 0; i < numberOfObservations; i++) {
-			residual[i] = centeredScaledResponse[i] - predict(designMatrix[i]);
-		}
-	}
-	
-	/**
-	 * Public method that uses predictors of one observations to predict a response with the beta vector.
-	 * @param x is a double vector
-	 * @return returns the predicted value
-	 */
-	public double predictRetransformed(double[] x) {
-		double yhat = 0;
-		for (int j=0; j<dimensionality; j++) {
-			yhat += beta[j] * x[j];
-		}
-		return yhat*scaleOfTheResponse + centerOfTheResponse;
-	}
-	
-	/**
-	 * Overloaded method that uses the i-th observation
-	 * @param i
-	 * @return predictRetransformed(designMatrix[i])
-	 */
-	public double predictRetranformed(int i) {
-		return predictRetransformed(designMatrix[i]);
-	}
-	
-	/**
-	 * Public method that uses new observations to predict a response with the beta vector after checking if it needs to be modified.
-	 * @param x is a double vector
-	 * @return predictRetransformed(x)
-	 */
-	public double predictRetransformedNewObs(double[] x) {
-		if (x.length != beta.length) //throw some kind of exception?
-		if (featureCentering) { // if featureCentering is true, then we center the the new observation
-        	for (int j=1; j<dimensionality; j++) {
-        		x[j] = x[j] - centerVectorOfTheDesignMatrix[j];
-        	}
-        }
-        
-        if (featureStandardization) { // if featureCentering is true, then we center the feature vectors
-        	for (int j=1; j<dimensionality; j++) {
-        		x[j] = x[j] / scalingVectorOfTheDesignMatrix[j];
-        	}
-        }
-        return predictRetransformed(x);
-	}
-	
-	/**
-	 * Public method that uses predictors of one observations to predict a response for a given beta vector.
-	 * @param x is a double vector
-	 * @param beta is a double vector
-	 * @return returns the predicted value
-	 */
-	public double predict(double[] x, double[] beta) {
-		double yhat = 0;
-		for (int j=0; j<dimensionality; j++) {
-			yhat += beta[j] * x[j];
-		}
-		return yhat;
-	}
-	
-	/**
-	 * Public method that uses predictors of one observations to predict a response for the saved beta vector.
-	 * @param x is a double vector
-	 * @return returns the predicted value
-	 */
-	public double predict(double[] x) {
-		double[] betaTemp = this.beta.clone();
-		return predict(x, betaTemp);
-	}
+	// CV setter for lambda 
+    /**
+     * Method that uses K-fold Cross Validation to find a suitable lambda from a predefined lambda grid.
+     * @param seed 
+     * @param K is the integer for K-fold CV
+     * @param method - set to 0 for Subgradient, to 1 for CycleCoord, to 2 for GreedyCoord
+     */
+    public void setLambdaWithCV(int seed, int K, int method) {
+    	double[] lambdaGrid = {0.0001, 0.001, 0.01, 0.1, 0.5, 1.0, 1.5, 2.0};//, 10.0, 100.0, 1000.0};
+    	double[] betaCV = new double[dimensionality];
+    	
+    	Random rng = new Random();
+    	//rng.setSeed(seed);
+    	
+    	// first let's shuffle our observations with Collections shuffle()
+    	Integer[] indexArray = new Integer[numberOfObservations];
+    	for (int i=0; i<numberOfObservations; i++) {
+    		indexArray[i] = i;
+    	}
+    	List<Integer> indexList = Arrays.asList(indexArray);
+    	Collections.shuffle(indexList, rng);
+    	indexList.toArray(indexArray);
+    	double[][] cvXcomplete = new double[numberOfObservations][dimensionality]; 		// initialize whole helper
+    	double[] cvYcomplete = new double[numberOfObservations]; 						// initialize whole helper
+    	for(int i=0; i<numberOfObservations; i++) {
+    		int iShuffled = indexArray[i];
+    		cvXcomplete[i] = designMatrix[iShuffled];
+    		cvYcomplete[i] = centeredScaledResponse[iShuffled];
+    	} // there is probably an easier way to shuffle this stuff around, but let's continue
+    	
+    	int kChunkSize = numberOfObservations / K;
+    	int[] kChunkNumber = new int[numberOfObservations];
+    	for (int i=0; i<numberOfObservations; i++) {
+    		kChunkNumber[i] = i / kChunkSize;
+    	}
+    	
+    	double[] tempError = new double[lambdaGrid.length];
+    	
+    	// kFoldLoop:
+    	for (int k=0; k<K; k++) {
+    		System.out.println("New loop number "+k+" ");
+    		int testSize;
+    		if (k < K-1) { 									// the last chunk could be bigger from construction
+    			testSize = kChunkSize;
+    		} else {
+    			testSize = numberOfObservations - (K-1) * kChunkSize;
+    		}
+    		int trainSize = numberOfObservations - testSize;
+    		double[][] cvXtrain = new double[trainSize][dimensionality];
+    		double[] cvYtrain = new double[trainSize];
+    		double[][] cvXtest = new double[testSize][dimensionality];
+    		double[] cvYtest = new double[testSize];
+    		int trainIndex = 0;
+    		int testIndex = 0;
+    		for (int i=0; i<numberOfObservations; i++) { 	// let's fill them
+    			if (kChunkNumber[i] != k) {
+    				cvXtrain[trainIndex] = cvXcomplete[i];
+    				cvYtrain[trainIndex] = cvYcomplete[i];
+    				trainIndex++;
+    			} else {
+    				cvXtest[testIndex] = cvXcomplete[i];
+    				cvYtest[testIndex] = cvYcomplete[i];
+    				testIndex++;
+    			}
+    		}
+    		
+    		// lambdaLoop:
+    		for (int l=0; l<lambdaGrid.length; l++) {
+    			// System.out.print("lambda = "+lambdaGrid[l]+" ");
+    			if (method == 0) {
+    				betaCV = trainSubgradient(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
+    			} else if (method == 1) {
+    				betaCV = trainCycleCoord(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
+    				// System.out.println(betaCV[0]+"   "+betaCV[1]+"   "+betaCV[2]);
+    			} else if (method == 2) {
+    				betaCV = trainGreedyCoord(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
+    				// System.out.println(betaCV[0]+"   "+betaCV[1]+"   "+betaCV[2]);
+    			}
+    			tempError[l] += computeLossValue(cvXtest, cvYtest, betaCV, 0.); // actually we compute here the OLS loss, but this choice isn't clear from a theoretical point of view 
+    			// System.out.println("tempError of lambda = "+lambdaGrid[l]+" is updated to "+ tempError[l]/(k+1));
+    		}
+    	}
+    	
+    	// let's see which lambda won this
+    	int bestLambda = 0;
+    	for (int l=0; l<lambdaGrid.length; l++) { 		// should start at 1
+    		System.out.println("tempError of " + lambdaGrid[l] + " is " + tempError[l]);
+    		if (tempError[l] < tempError[bestLambda]) {
+    			bestLambda = l;
+    		}
+    	}
 
-	/**
-	 * Overloaded method that uses the i-th observation
-	 * @param i
-	 * @return predict(designMatrix[i])
-	 */
-	public double predict(int i) {
-		return predict(designMatrix[i]);
-	}
+    	setLambda(lambdaGrid[bestLambda]);
+    	System.out.println("Lambda was set to "+ getLambda());
+    }
 	
-	public double computeLossValue(double[][] designMatrix, double[] response, double[] beta, double lambda) {
-		double betaSum = 0.;
-		for(int j=0; j<beta.length; j++) {
-			betaSum += beta[j];
-		}
-		double lossValue = lambda*betaSum;
-		for (int i=0; i<response.length; i++) {
-			lossValue += Math.pow(response[i] - predict(designMatrix[i], beta),2);
-		}
-		
-		return lossValue;
-	}
 	
+	// three different stepwise algorithms to actually train the lasso model
 	
     /**
 	 * This method uses the simplified assumption that the derivative for the lasso penalty is given by
@@ -589,109 +658,203 @@ public class MyLasso {
 		} 
 		return betaUpdated;
 	}
+
+	
+	/* quality of life chapter - here are methods collected to easily access the trained model (beta and residuals)
+	 * as well use the model to predict a response for a new observation etc.
+	 */
+	
+	/**
+	 * @return coefficient array beta 
+	 */
+	public double[] getBeta() {
+		return beta;
+	}
+	/**
+	 * prints each beta coefficient in a new line
+	 */
+	public void printBeta() {
+		for (int j=0; j<dimensionality; j++) {
+			System.out.println("Beta" + j + ": " + beta[j]);
+		}
+	}
+	/**
+	 * @param j specifies which element of the beta array should be returned
+	 * @return beta[j]
+	 */
+	public double getSpecificBeta(int j) {
+		return beta[j];
+	}
+	
+	/**
+	 * @return residual array
+	 */
+	public double[] getResiduals() {
+		return residual;
+	}
+	/**
+	 * prints each residual in a new line
+	 */
+	public void printResidual() {
+		for (int i=0; i<numberOfObservations; i++) {
+			System.out.println("Residual" + i + ": " + residual[i]);
+		}
+	}
+	/**
+	 * @param i specifies which element of the residual array should be returned
+	 * @return residual[i]
+	 */
+	public double getSpecificResidual(int i) {
+		return residual[i];
+	}
+	
+	// private method that updates the residuals after training.
+	private void updateResiduals() {
+		for (int i = 0; i < numberOfObservations; i++) {
+			residual[i] = centeredScaledResponse[i] - predict(designMatrix[i]);
+		}
+	}
+	
+
+	/**
+	 * Public method that uses predictors of one observations to predict a response with the beta vector.
+	 * @param x is a double vector
+	 * @return returns the predicted value
+	 */
+	public double predictRetransformed(double[] x) {
+		double yhat = 0;
+		for (int j=0; j<dimensionality; j++) {
+			yhat += beta[j] * x[j];
+		}
+		return yhat*scaleOfTheResponse + centerOfTheResponse;
+	}
+	
+	/**
+	 * Overloaded method that uses the i-th observation
+	 * @param i
+	 * @return predictRetransformed(designMatrix[i])
+	 */
+	public double predictRetranformed(int i) {
+		return predictRetransformed(designMatrix[i]);
+	}
+	
+	/**
+	 * Public method that uses new observations to predict a response with the beta vector after checking if it needs to be modified.
+	 * @param x is a double vector
+	 * @return predictRetransformed(x)
+	 */
+	public double predictRetransformedNewObs(double[] x) {
+		if (x.length != beta.length) 						//throw some kind of exception?
+		if (featureCentering) { 							// if featureCentering is true, then we center the the new observation
+        	for (int j=1; j<dimensionality; j++) {
+        		x[j] = x[j] - centerVectorOfTheDesignMatrix[j];
+        	}
+        }
+        
+        if (featureStandardization) { 						// if featureCentering is true, then we center the feature vectors
+        	for (int j=1; j<dimensionality; j++) {
+        		x[j] = x[j] / scalingVectorOfTheDesignMatrix[j];
+        	}
+        }
+        return predictRetransformed(x);
+	}
+	
+	/**
+	 * Public method that uses predictors of one observations to predict a response for a given beta vector.
+	 * @param x is a double vector
+	 * @param beta is a double vector
+	 * @return returns the predicted value
+	 */
+	public double predict(double[] x, double[] beta) {
+		double yhat = 0;
+		for (int j=0; j<dimensionality; j++) {
+			yhat += beta[j] * x[j];
+		}
+		return yhat;
+	}
+	
+	/**
+	 * Public method that uses predictors of one observations to predict a response for the saved beta vector.
+	 * @param x is a double vector
+	 * @return returns the predicted value
+	 */
+	public double predict(double[] x) {
+		double[] betaTemp = this.beta.clone();
+		return predict(x, betaTemp);
+	}
+
+	/**
+	 * Overloaded method that uses the i-th observation
+	 * @param i
+	 * @return predict(designMatrix[i])
+	 */
+	public double predict(int i) {
+		return predict(designMatrix[i]);
+	}
+	
+	/**
+	 * Computes the lasso loss.
+	 * Which is the sum of the OLS loss plus lambda times the L1-norm of beta.
+	 * @param designMatrix
+	 * @param response
+	 * @param beta
+	 * @param lambda
+	 * @return lasso loss as a double
+	 */
+	public double computeLossValue(double[][] designMatrix, double[] response, double[] beta, double lambda) {
+		double betaSum = 0.;
+		for(int j=0; j<beta.length; j++) {
+			betaSum += beta[j];
+		}
+		double lossValue = lambda*betaSum;
+		for (int i=0; i<response.length; i++) {
+			lossValue += Math.pow(response[i] - predict(designMatrix[i], beta),2);
+		}
+		
+		return lossValue;
+	}
+	
+	// wrapper classes around the algorithms that show the computation time and update the residual with the new model
+	/**
+	 * Public method of the simplified gradient descent method that uses the set parameters to train.
+	 */
+	public void trainSubgradient() {
+		long startTimeStamp = System.nanoTime();
+		beta = trainSubgradient(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
+		long endTimeStamp = System.nanoTime();
+		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
+		updateResiduals();
+	}
+	
+	/**
+	 * Public method of the simplified gradient descent method that uses the set parameters to train.
+	 */
+	public void trainCycleCoord() {
+		long startTimeStamp = System.nanoTime();
+		beta = trainCycleCoord(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
+		long endTimeStamp = System.nanoTime();
+		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
+		updateResiduals();
+	}
+	
+	/**
+	 * Public method of the simplified gradient descent method that uses the set parameters to train.
+	 */
+	public void trainGreedyCoord() {
+		long startTimeStamp = System.nanoTime();
+		beta = this.trainGreedyCoord(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
+		long endTimeStamp = System.nanoTime();
+		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
+		updateResiduals();
+	}
+	
+
+	// self written utility functions used mainly in the constructor
 	
     /**
-     * Basic Constructor. This prepares the class before it can be trained.
-     * @param predictor is the predictor matrix of the data set.
-     * @param response is the response vector of the data set.
-     */
-    public MyLasso(double[][] predictor, double[] response) {
-        this(predictor, response, true, true);
-    }
-
-    /**
-     * Complete Constructor. This prepares the class before it can be trained.
-     * @param predictor is the predictor matrix of the data set.
-     * @param response is the response vector of the data set.
-     * @param featureCentering is the boolean to center the predictor.
-     * @param featureStandardization is the boolean to standardize the predictor.
-     */
-    public MyLasso(double[][] predictor, double[] response, boolean featureCentering, boolean featureStandardization) {
-    	
-    	this.dimensionality = predictor[0].length; // set the dimensionality
-    	// System.out.println("dimensionality "+ predictor[0].length);
-        this.numberOfObservations = response.length; // set the number of Observations
-        // System.out.println("numberOfObservations " + response.length);
-        
-        this.centerOfTheResponse = findCenter(response); // set the center of the response vector
-        System.out.println("centerResponse " + findCenter(response));
-        this.scaleOfTheResponse = findStandardizationFactor(response); // set the scale factor of the response vector
-        System.out.println("scaleResponse " + findStandardizationFactor(response));
-        
-        
-        this.centeredScaledResponse = new double[numberOfObservations];
-        for (int i=0; i<numberOfObservations; i++) { // let's save the centered and scaled response vector
-        	centeredScaledResponse[i] = (response[i] - centerOfTheResponse) / scaleOfTheResponse;
-        }
-        
-        
-        // let's save the design matrix and be flexible if the input is the design matrix or just the predictor matrix
-        predictorOrDesignMatrixloop:
-        for (int i=0; i<numberOfObservations; i++) { // and let's assume that if the 0-th feature of the predictor is 1 for all observations, then it is already a design matrix
-        	if (predictor[i][0] != 1) {
-        		this.isAlreadyTheDesignMatrix = false;
-        		break predictorOrDesignMatrixloop;
-        	}
-        }
-        if (this.isAlreadyTheDesignMatrix) {
-        	this.designMatrix = new double[numberOfObservations][dimensionality];
-        	for (int i=0; i<numberOfObservations; i++) { // loop over observations
-				for (int j=0; j<dimensionality; j++) { // loop over feature
-					designMatrix[i][j] = predictor[i][j];
-				}
-        	}
-        } else {
-        	dimensionality++;
-        	this.designMatrix = new double[numberOfObservations][dimensionality];
-        	for (int i=0; i<numberOfObservations; i++) { // loop over observations
-        		designMatrix[i][0] = 1.0;
-				for (int j=1; j<dimensionality; j++) { // loop over feature
-					designMatrix[i][j] = predictor[i][j-1];
-				}
-        	}
-        }
-        
-        if (this.featureCentering) { // if featureCentering is true, then we center the feature vectors
-        	this.centerVectorOfTheDesignMatrix = new double[dimensionality];
-        	for (int j=1; j<dimensionality; j++) {
-        		double[] helpVector = new double[numberOfObservations];
-        		for (int i=0; i<numberOfObservations; i++) { // we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
-        			helpVector[i] = designMatrix[i][j];
-        		}
-        		centerVectorOfTheDesignMatrix[j] = findCenter(helpVector); 
-        		for (int i=0; i<numberOfObservations; i++) { // centers the j-th feature vector
-        			designMatrix[i][j] = designMatrix[i][j] - centerVectorOfTheDesignMatrix[j];
-        		}
-        	}
-        	// favorite row
-        }
-        
-        if (this.featureStandardization) { // if featureCentering is true, then we center the feature vectors
-        	this.scalingVectorOfTheDesignMatrix = new double[dimensionality];
-        	for (int j=1; j<dimensionality; j++) {
-        		double[] helpVector = new double[numberOfObservations];
-        		for (int i=0; i<numberOfObservations; i++) { // we construct a help vector because I don't know if there is a convenient way to extract the feature vectors
-        			helpVector[i] = designMatrix[i][j];
-        		}
-        		scalingVectorOfTheDesignMatrix[j] = findStandardizationFactor(helpVector); 
-        		for (int i=0; i<numberOfObservations; i++) { // centers the j-th feature vector
-        			designMatrix[i][j] = designMatrix[i][j] / scalingVectorOfTheDesignMatrix[j];
-        		}
-        	}
-        }
-        
-        beta = new double[dimensionality]; // initialize beta vector
-        residual = new double[numberOfObservations]; // initialize residual vector
-        System.out.println("Which algorithm do you want to use to train Lasso?"); 
-        System.out.println("You can use the methods trainSubgradient(), trainCycleCoord() or trainGreedyCoord()");
-        System.out.println("");
-    }
-
-    
-    /**
      * method to find the center of a given vector via Kahan summation
-     * @param originalResponse
-     * @return sum(originalResponse) / originalResponse.length
+     * @param originalVector
+     * @return sum(originalVector) / originalVector.length
      */
     private static double findCenter(double[] originalVector) {   	
     	// let's sum the response values via the Kahan sum algorithm since potential datasets can be very big
@@ -708,8 +871,8 @@ public class MyLasso {
     
     /**
      * method to find the mean squared sum of a given vector via Kahan summation
-     * @param originalResponse
-     * @return sum(originalResponse) / originalResponse.length
+     * @param originalVector
+     * @return sum(originalVector)^2 / originalVector.length
      */
     private static double findStandardizationFactor(double[] originalVector) {
     	// let's sum the squared response values via the Kahan sum algorithm since potential datasets can be very big
@@ -724,99 +887,6 @@ public class MyLasso {
 		return Math.sqrt(theTheoreticalSum) / originalVector.length;
     }
 	
-    /**
-     * Method that uses K-fold Cross Validation to find a suitable lambda from a predefined lambda grid.
-     * @param seed 
-     * @param K is the integer for K-fold CV
-     * @param method - set to 0 for Subgradient, to 1 for CycleCoord, to 2 for GreedyCoord
-     */
-    public void setLambdaWithCV(int seed, int K, int method) {
-    	double[] lambdaGrid = {0.0001, 0.001, 0.01, 0.1, 0.5, 1.0, 1.5, 2.0};//, 10.0, 100.0, 1000.0};
-    	double[] betaCV = new double[dimensionality];
-    	
-    	Random rng = new Random();
-    	//rng.setSeed(seed);
-    	
-    	// first let's shuffle our observations with Collections shuffle()
-    	Integer[] indexArray = new Integer[numberOfObservations];
-    	for (int i=0; i<numberOfObservations; i++) {
-    		indexArray[i] = i;
-    	}
-    	List<Integer> indexList = Arrays.asList(indexArray);
-    	Collections.shuffle(indexList, rng);
-    	indexList.toArray(indexArray);
-    	double[][] cvXcomplete = new double[numberOfObservations][dimensionality]; // initialize whole helper
-    	double[] cvYcomplete = new double[numberOfObservations]; // initialize whole helper
-    	for(int i=0; i<numberOfObservations; i++) {
-    		int iShuffled = indexArray[i];
-    		cvXcomplete[i] = designMatrix[iShuffled];
-    		cvYcomplete[i] = centeredScaledResponse[iShuffled];
-    	} // there is probably an easier way to shuffle this stuff around, but let's continue
-    	
-    	int kChunkSize = numberOfObservations / K;
-    	int[] kChunkNumber = new int[numberOfObservations];
-    	for (int i=0; i<numberOfObservations; i++) {
-    		kChunkNumber[i] = i / kChunkSize;
-    	}
-    	
-    	double[] tempError = new double[lambdaGrid.length];
-    	
-    	// kFoldLoop:
-    	for (int k=0; k<K; k++) {
-    		System.out.println("New loop number "+k+" ");
-    		int testSize;
-    		if (k < K-1) { // the last chunk could be bigger from construction
-    			testSize = kChunkSize;
-    		} else {
-    			testSize = numberOfObservations - (K-1) * kChunkSize;
-    		}
-    		int trainSize = numberOfObservations - testSize;
-    		double[][] cvXtrain = new double[trainSize][dimensionality];
-    		double[] cvYtrain = new double[trainSize];
-    		double[][] cvXtest = new double[testSize][dimensionality];
-    		double[] cvYtest = new double[testSize];
-    		int trainIndex = 0;
-    		int testIndex = 0;
-    		for (int i=0; i<numberOfObservations; i++) { // let's fill them
-    			if (kChunkNumber[i] != k) {
-    				cvXtrain[trainIndex] = cvXcomplete[i];
-    				cvYtrain[trainIndex] = cvYcomplete[i];
-    				trainIndex++;
-    			} else {
-    				cvXtest[testIndex] = cvXcomplete[i];
-    				cvYtest[testIndex] = cvYcomplete[i];
-    				testIndex++;
-    			}
-    		}
-    		
-    		// lambdaLoop:
-    		for (int l=0; l<lambdaGrid.length; l++) {
-    			// System.out.print("lambda = "+lambdaGrid[l]+" ");
-    			if (method == 0) {
-    				betaCV = trainSubgradient(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
-    			} else if (method == 1) {
-    				betaCV = trainCycleCoord(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
-    				System.out.println(betaCV[0]+"   "+betaCV[1]+"   "+betaCV[2]);
-    			} else if (method == 2) {
-    				betaCV = trainGreedyCoord(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
-    				System.out.println(betaCV[0]+"   "+betaCV[1]+"   "+betaCV[2]);
-    			}
-    			tempError[l] += computeLossValue(cvXtest, cvYtest, betaCV, 0.); // actually we compute here the OLS loss, but this choice isn't clear from a theoretical point of view 
-    			//System.out.println("tempError of lambda = "+lambdaGrid[l]+" is updated to "+ tempError[l]/(k+1));
-    		}
-    	}
-    	
-    	// let's see which lambda won this
-    	int bestLambda = 0;
-    	for (int l=0; l<lambdaGrid.length; l++) { // should start at 1
-    		System.out.println("tempError of " + lambdaGrid[l] + " is " + tempError[l]);
-    		if (tempError[l] < tempError[bestLambda]) {
-    			bestLambda = l;
-    		}
-    	}
 
-    	setLambda(lambdaGrid[bestLambda]);
-    	System.out.println("Lambda was set to "+ getLambda());
-    }
 	
 }
