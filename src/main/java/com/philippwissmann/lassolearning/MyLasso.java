@@ -232,7 +232,6 @@ public class MyLasso {
 	 * @param lambda as a double
 	 */
 	public void setLambda(double lambda) {
-		if (lambda < 0) 				//throw new exception; // HERE COULD land a fitting exception
 		this.lambda = lambda;
 	}
 	
@@ -250,7 +249,6 @@ public class MyLasso {
 	 * @param learningRate as a double
 	 */
 	public void setLearningRate(double learningRate) {
-		if (learningRate < 0) 			//throw new exception; // HERE COULD land a fitting exception
 		this.learningRate = learningRate;
 	}
 	
@@ -268,7 +266,6 @@ public class MyLasso {
 	 * @param tolerance as a double
 	 */
 	public void setTolerance(double tolerance) {
-		if (tolerance < 0) 				//throw new exception; // HERE COULD land a fitting exception
 		this.tolerance = tolerance;
 	}
 	
@@ -285,7 +282,6 @@ public class MyLasso {
 	 * @param maxSteps as an int 
 	 */
 	public void setMaxSteps(int maxSteps) {
-		if (maxSteps < 0) 				//throw new exception; // HERE COULD land a fitting exception
 		this.maxSteps = maxSteps;
 	}
 	/**
@@ -320,7 +316,7 @@ public class MyLasso {
     	
     	// loop over k
     	for (int k=0; k<K; k++) {
-    		// we compute the testSize and trainSize
+    		// compute the testSize and trainSize
     		int testSetSize;
     		if (k >= numberOfObservations%K) {
     			testSetSize = numberOfObservations / K;
@@ -335,7 +331,7 @@ public class MyLasso {
     		double[][] cvXtest = new double[testSetSize][dimensionality];
     		double[] cvYtest = new double[testSetSize];
     		
-    		// we put observations into the train or the test set depending on the current k
+    		// put observations into the train or the test set depending on the current k
     		int trainSetIndex = 0, testSetIndex = 0;
     		for (int i=0; i<numberOfObservations; i++) { 	
     			if (indexArrayShuffled[i] != k) { 
@@ -410,7 +406,7 @@ public class MyLasso {
 		// printing explanation
 		if(tellMeWhatIsHappening) System.out.println("Training via batch gradient descent in progress. Please wait...");
 		
-		// first calculate the error
+		// first calculate the residuals
 		trainStepLoop:
 		for (; timeStep <maxSteps; timeStep++) { 																		// loop over steps																				
 			residualInTraining = Utilities.subtract(response, Utilities.mult(designMatrix, betaInTraining));					// compute residuals
@@ -604,7 +600,7 @@ public class MyLasso {
 					steepDerivative = forwardDerivative;
 					steepCoeff = j;
 					isBackwardDerivative = false;
-				} else if (backwardDerivative < steepDerivative) { 	// since our objective we want to minimize is convex utmost one of these conditions can be true
+				} else if (backwardDerivative < steepDerivative) { 	// since our objective to minimize is convex utmost one of these conditions can be true
 					steepDerivative = backwardDerivative;
 					steepCoeff = j;
 					isBackwardDerivative = true;
@@ -800,7 +796,7 @@ public class MyLasso {
 		long startTimeStamp = System.nanoTime();
 		beta = trainSubgradient(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
 		long endTimeStamp = System.nanoTime();
-		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
+		if (tellMeWhatIsHappening) System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
 		updateResiduals();
 	}
 	
@@ -812,7 +808,7 @@ public class MyLasso {
 		long startTimeStamp = System.nanoTime();
 		beta = trainCycleCoord(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
 		long endTimeStamp = System.nanoTime();
-		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
+		if(tellMeWhatIsHappening) System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
 		updateResiduals();
 	}
 	
@@ -824,7 +820,7 @@ public class MyLasso {
 		long startTimeStamp = System.nanoTime();
 		beta = this.trainGreedyCoord(designMatrix, centeredScaledResponse, lambda, tolerance, maxSteps, learningRate).clone();
 		long endTimeStamp = System.nanoTime();
-		System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
+		if(tellMeWhatIsHappening) System.out.println("The algorithm needed " + (endTimeStamp - startTimeStamp) / (double) 1000000 + " ms.");
 		updateResiduals();
 	}
 	
