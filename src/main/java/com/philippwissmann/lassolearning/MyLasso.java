@@ -3,6 +3,7 @@
  */
 package com.philippwissmann.lassolearning;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -306,63 +307,49 @@ public class MyLasso {
     public void setLambdaWithCV(int seed, int K, int method) {
     	double[] lambdaGrid = {0.0001, 0.001, 0.01, 0.1, 0.5, 1.0, 1.5, 2.0};//, 10.0, 100.0, 1000.0};
     	double[] betaCV = new double[dimensionality];
-    	
-    	Random rng = new Random();
-    	//rng.setSeed(seed);
-    	
-    	// first let's shuffle our observations with Collections shuffle()
-    	Integer[] indexArray = new Integer[numberOfObservations];
-    	for (int i=0; i<numberOfObservations; i++) {
-    		indexArray[i] = i;
-    	}
-    	List<Integer> indexList = Arrays.asList(indexArray);
-    	Collections.shuffle(indexList, rng);
-    	indexList.toArray(indexArray);
-    	double[][] cvXcomplete = new double[numberOfObservations][dimensionality]; 		// initialize whole helper								// extract vector
-    	double[] cvYcomplete = new double[numberOfObservations]; 						// initialize whole helper								// extract vector
-    	for(int i=0; i<numberOfObservations; i++) {
-    		int iShuffled = indexArray[i];
-    		cvXcomplete[i] = designMatrix[iShuffled];
-    		cvYcomplete[i] = centeredScaledResponse[iShuffled];
-    	} // there is probably an easier way to shuffle this stuff around, but let's continue
-    	
-    	int kChunkSize = numberOfObservations / K;
-    	int[] kChunkNumber = new int[numberOfObservations];
-    	for (int i=0; i<numberOfObservations; i++) {
-    		kChunkNumber[i] = i / kChunkSize;
-    	}
-    	
     	double[] tempError = new double[lambdaGrid.length];
     	
-    	// kFoldLoop:
+    	Random rng = new Random();
+    	rng.setSeed(seed);
+    	
+    	// shuffling indexList with Collections.shuffle() to randomly assign each observation to one of the K splits
+    	List<Integer> indexList = new ArrayList<>(numberOfObservations);
+    	for (int i=0; i<numberOfObservations; i++) indexList.add(i%K);
+    	Collections.shuffle(indexList, rng);
+    	int[] indexArrayShuffled = indexList.stream().mapToInt(Integer::intValue).toArray();
+    	
+    	// loop over k
     	for (int k=0; k<K; k++) {
-    		System.out.println("Computing loop number "+(k+1)+".");
-    		int testSize;
-    		if (k < K-1) { 									// the last chunk could be bigger from construction
-    			testSize = kChunkSize;
+    		// we compute the testSize and trainSize
+    		int testSetSize;
+    		if (k >= numberOfObservations%K) {
+    			testSetSize = numberOfObservations / K;
     		} else {
-    			testSize = numberOfObservations - (K-1) * kChunkSize;
-    		}
-    		int trainSize = numberOfObservations - testSize;
-    		double[][] cvXtrain = new double[trainSize][dimensionality];
-    		double[] cvYtrain = new double[trainSize];
-    		double[][] cvXtest = new double[testSize][dimensionality];
-    		double[] cvYtest = new double[testSize];
-    		int trainIndex = 0;
-    		int testIndex = 0;
-    		for (int i=0; i<numberOfObservations; i++) { 	// let's fill them
-    			if (kChunkNumber[i] != k) { 
-    				cvXtrain[trainIndex] = cvXcomplete[i];
-    				cvYtrain[trainIndex] = cvYcomplete[i];
-    				trainIndex++;
+    			testSetSize = numberOfObservations / K + 1;	// first few chunks can have one observation more if the division leaves a rest
+    		}	
+    		int trainSetSize = numberOfObservations - testSetSize;
+    		
+    		// initialize the splitted dataset
+    		double[][] cvXtrain = new double[trainSetSize][dimensionality];
+    		double[] cvYtrain = new double[trainSetSize];
+    		double[][] cvXtest = new double[testSetSize][dimensionality];
+    		double[] cvYtest = new double[testSetSize];
+    		
+    		// we put observations into the train or the test set depending on the current k
+    		int trainSetIndex = 0, testSetIndex = 0;
+    		for (int i=0; i<numberOfObservations; i++) { 	
+    			if (indexArrayShuffled[i] != k) { 
+    				cvXtrain[trainSetIndex] = designMatrix[i].clone();
+    				cvYtrain[trainSetIndex] = centeredScaledResponse[i];
+    				trainSetIndex++;
     			} else {
-    				cvXtest[testIndex] = cvXcomplete[i];
-    				cvYtest[testIndex] = cvYcomplete[i];
-    				testIndex++;
+    				cvXtest[testSetIndex] = designMatrix[i].clone();
+    				cvYtest[testSetIndex] = centeredScaledResponse[i];
+    				testSetIndex++;
     			}
     		}
     		
-    		// lambdaLoop:
+    		// loop over lambdaGrid
     		for (int l=0; l<lambdaGrid.length; l++) {
     			if (method == 0) {
     				betaCV = trainSubgradient(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
@@ -371,15 +358,14 @@ public class MyLasso {
     			} else if (method == 2) {
     				betaCV = trainGreedyCoord(cvXtrain, cvYtrain, lambdaGrid[l], tolerance, maxSteps, learningRate).clone();
     			}
-    			tempError[l] += computeLossValue(cvXtest, cvYtest, betaCV, 0.); // actually we compute here the OLS loss, but this choice isn't clear from a theoretical point of view 
+    			tempError[l] += computeLossValue(cvXtest, cvYtest, betaCV, 0.); // we compute here the OLS loss, but this choice is flexible from a theoretical point of view 
     		}
     	}
     	
     	
     	// let's see which lambda won this and set it
     	int bestLambda = 0;
-    	for (int l=0; l<lambdaGrid.length; l++) { 		// should start at 1
-    		System.out.println("tempError of " + lambdaGrid[l] + " is " + tempError[l]);
+    	for (int l=0; l<lambdaGrid.length; l++) { 		
     		if (tempError[l] < tempError[bestLambda]) {
     			bestLambda = l;
     		}
@@ -421,27 +407,21 @@ public class MyLasso {
 		double[] residualInTraining = new double[m];
 		int timeStep = 0;
 		
-		System.out.println("Training via batch gradient descent in progress. Please wait...");
+		// printing explanation
+		if(tellMeWhatIsHappening) System.out.println("Training via batch gradient descent in progress. Please wait...");
+		
 		// first calculate the error
 		trainStepLoop:
-		for (; timeStep <maxSteps; timeStep++) { 				// loop over steps																				// product
-			for (int i=0; i<m; i++) { 							// loop over errors
-				residualInTraining[i] = response[i];
-				for (int j=0; j<n; j++) { 
-					residualInTraining[i] -= designMatrix[i][j] * betaInTraining[j];
-				}
-			}
+		for (; timeStep <maxSteps; timeStep++) { 																		// loop over steps																				
+			residualInTraining = Utilities.subtract(response, Utilities.mult(designMatrix, betaInTraining));					// compute residuals
 			
-			//residualInTraining = Utilities.subtract(response, Utilities.mult(designMatrix, betaInTraining));													// testing
-			
-			
-			for (int j=0; j<n; j++) { 							// loop over beta updates																		// col of matrix?
+			for (int j=0; j<n; j++) { 																						// loop over beta updates	
 				double gradient;
-				if (j==0) {gradient = 0.0;} else if (betaInTraining[j]<0) {gradient = lambda;} else {gradient = - lambda;}; 	// here is the subgradient instead of the gradient
+				if (j==0) {gradient = 0.0;} else if (betaInTraining[j]<0) {gradient = lambda;} else {gradient = - lambda;}; 	// compute gradient
 				for (int i=0; i<m; i++) { 
 					gradient += residualInTraining[i] * designMatrix[i][j];
 				}
-				betaUpdated[j] = betaInTraining[j] + learningRate * gradient / m;
+				betaUpdated[j] = betaInTraining[j] + learningRate * gradient / m;												// (sub-)gradient step
 			}
 
 			checkMovementLoop:
@@ -458,10 +438,13 @@ public class MyLasso {
 			betaInTraining = betaUpdated.clone(); 				// now to reset the trainStepLoop
 		}
 		
-		if (timeStep < maxSteps) {
-			System.out.println("You reached your destination after " + timeStep + " steps. Congrats.");
-		} else {
-			System.out.println("You used the given computing contingent at " + maxSteps + " steps.");
+		// printing explanation
+		if(tellMeWhatIsHappening) {
+			if (timeStep < maxSteps) {
+				System.out.println("You reached your destination after " + timeStep + " steps. Congrats.");
+			} else {
+				System.out.println("You used the given computing contingent at " + maxSteps + " steps.");
+			}
 		}
 		return betaUpdated;
 	}
@@ -488,7 +471,8 @@ public class MyLasso {
 		double[] squaredSumOfJPredictors = new double[n];
 		int timeStep = 0;
 		
-		System.out.println("Training via cyclic coordinate descent in progress. Please wait...");
+		// printing explanation
+		if(tellMeWhatIsHappening) System.out.println("Training via cyclic coordinate descent in progress. Please wait...");
 		
 		for (int i=0; i<m; i++) { 								// compute the start residuals
 			residualInTraining[i] = response[i];
@@ -500,28 +484,28 @@ public class MyLasso {
 		}
 		
 		trainStepLoop:
-		for (; timeStep < maxSteps; timeStep++) { 				// loop over steps
+		for (; timeStep < maxSteps; timeStep++) { 													// loop over steps
 
-			for (int j=0; j<n; j++) { 							// loop over beta updates
-				if (j==0) { 									// update the intercept
-					double interceptDerivative = 0; 			// negative sum of the residuals						// initialize directly
+			for (int j=0; j<n; j++) { 																// loop over beta updates
+				if (j==0) { 									
+					double interceptDerivative = 0; 												// negative sum of the residuals		
 					for (int i=0; i<m; i++) { //
 						interceptDerivative -= residualInTraining[i];
 					}
-					betaUpdated[0] = betaInTraining[0] - learningRate / m * interceptDerivative; 
-					for (int i=0; i<m; i++) { 					// update the residuals
-						residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);
+					betaUpdated[0] = betaInTraining[0] - learningRate / m * interceptDerivative; 	// update formula for intercept
+					for (int i=0; i<m; i++) { 					
+						residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);				// update the residuals
 					}
 				}
 				else {
-					double betajOLSDerivative = 0; 				// negative sum of the residuals times the X_(.j)		// initialize directly
+					double betajOLSDerivative = 0; 													// negative sum of the residuals times the X_(.j)	
 					for (int i=0; i<m; i++) { //
 						betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j];
 					}
-					betaUpdated[j] = Math.min(0, betaInTraining[j] - (betajOLSDerivative - lambda)/ squaredSumOfJPredictors[j]) + 
+					betaUpdated[j] = Math.min(0, betaInTraining[j] - (betajOLSDerivative - lambda)/ squaredSumOfJPredictors[j]) + 		// update formula for non-intercept
 							Math.max(0, betaInTraining[j] - (betajOLSDerivative + lambda)/ squaredSumOfJPredictors[j]);
-					for (int i=0; i<m; i++) { 					// update the residuals
-						residualInTraining[i] += designMatrix[i][j] * (betaInTraining[j]  - betaUpdated[j]);
+					for (int i=0; i<m; i++) { 					
+						residualInTraining[i] += designMatrix[i][j] * (betaInTraining[j]  - betaUpdated[j]);							// update the residuals
 					}
 				}
 			}
@@ -541,10 +525,13 @@ public class MyLasso {
 			
 		}
 		
-		if (timeStep < maxSteps) {
-			System.out.println("You reached your destination after " + timeStep + " steps. Congrats.");
-		} else {
-			System.out.println("You used the given computing contingent at " + maxSteps + " steps.");
+		// printing explanation
+		if(tellMeWhatIsHappening) {
+			if (timeStep < maxSteps) {
+				System.out.println("You reached your destination after " + timeStep + " steps. Congrats.");
+			} else {
+				System.out.println("You used the given computing contingent at " + maxSteps + " steps.");
+			}
 		}
 		return betaUpdated;
 	}
@@ -571,7 +558,8 @@ public class MyLasso {
 		double[] squaredSumOfJPredictors = new double[n];
 		int timeStep = 0;
 		
-		System.out.println("Training via greedy coordinate descent in progress. Please wait...");
+		// printing explanation
+		if(tellMeWhatIsHappening) System.out.println("Training via greedy coordinate descent in progress. Please wait...");
 		
 		for (int i=0; i<m; i++) { 								// compute the start residuals
 			residualInTraining[i] = response[i];
@@ -583,23 +571,24 @@ public class MyLasso {
 		}
 		
 		trainStepLoop:
-		for (; timeStep <maxSteps; timeStep++) { 				// loop over steps
+		for (; timeStep <maxSteps; timeStep++) { 					// loop over steps
 
-			double interceptDerivative = 0; 					// first let's look at the intercept derivative
+			// overhead to find the steepest derivative
+			double interceptDerivative = 0; 						// first let's look at the intercept derivative
 			for (int i=0; i<m; i++) { //
 				interceptDerivative -= residualInTraining[i];
 			}
-			double steepDerivative = interceptDerivative; 		// this value remembers the steepest descent, we initialize it with the intercept derivative
-			int steepCoeff = 0; 								// this is the coefficient that identifies the steepest descent
+			double steepDerivative = interceptDerivative; 			// this value remembers the steepest descent, we initialize it with the intercept derivative
+			int steepCoeff = 0; 									// this is the coefficient that identifies the steepest descent
 			boolean isBackwardDerivative = false;
-			for (int j=1; j<n; j++) { 							// search for the steepest descent - we start at j=1 because we already computed the intercept thingy
-				double betajOLSDerivative = 0; 					// let's compute the derivative to compare
+			for (int j=1; j<n; j++) { 								// search for the steepest descent - we start at j=1 because we already computed the intercept thingy
+				double betajOLSDerivative = 0; 						// let's compute the derivative to compare
 				for (int i=0; i<m; i++) { //
 					betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j];
 				}
 				
 				double forwardDerivative = betajOLSDerivative;
-				if (betaInTraining[j] >= 0) { 					// here we build the directional derivatives that we want to compare depending on the sign of the coefficient ....
+				if (betaInTraining[j] >= 0) { 						// here we build the directional derivatives that we want to compare depending on the sign of the coefficient ....
 					forwardDerivative += lambda;
 				} else {
 					forwardDerivative -= lambda;
@@ -611,7 +600,7 @@ public class MyLasso {
 					backwardDerivative += lambda;
 				}
 				
-				if (forwardDerivative < steepDerivative) { 		// let's find out if we actually found a steeper descent
+				if (forwardDerivative < steepDerivative) { 			// let's find out if we actually found a steeper descent
 					steepDerivative = forwardDerivative;
 					steepCoeff = j;
 					isBackwardDerivative = false;
@@ -622,35 +611,39 @@ public class MyLasso {
 				}
 			}
 			
-			// now that we found the steepest descent, we check if it's really negative otherwise it won't improve beta
-			if (steepDerivative >= 0) break trainStepLoop;
 			
-			if (steepCoeff == 0) { 								// update the intercept
-				betaUpdated[0] = betaInTraining[0] - learningRate / m * steepDerivative; 
-				for (int i=0; i<m; i++) { 						// update the residuals
+			if (steepDerivative >= 0) break trainStepLoop;			// now that we found the steepest descent, we check if it's really negative otherwise it won't improve beta
+			
+			// update step
+			if (steepCoeff == 0) { 									// update the intercept
+				betaUpdated[0] = betaInTraining[0] - steepDerivative / m; 	
+				for (int i=0; i<m; i++) { 							// update the residuals
 					residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);
 				}
-			} else { 											// or update another coefficient
+			} else { 												// or update another coefficient
 				if (isBackwardDerivative) steepDerivative = - steepDerivative;
 				betaUpdated[steepCoeff] = Math.min(0, betaInTraining[steepCoeff] - (steepDerivative)/ squaredSumOfJPredictors[steepCoeff]) + 
 					Math.max(0, betaInTraining[steepCoeff] - (steepDerivative)/ squaredSumOfJPredictors[steepCoeff]);
-				for (int i=0; i<m; i++) { 						// update the residuals
+				for (int i=0; i<m; i++) { 							// update the residuals
 					residualInTraining[i] += designMatrix[i][steepCoeff] * (betaInTraining[steepCoeff]  - betaUpdated[steepCoeff]);
 				}
 			}
 			
 			if (Math.abs(betaUpdated[steepCoeff] - betaInTraining[steepCoeff]) < tolerance) {
 				timeStep++;
-				break trainStepLoop; 							// stops training if the update was smaller than the tolerance
+				break trainStepLoop; 								// stops training if the update was smaller than the tolerance
 			}
 			
-			betaInTraining = betaUpdated.clone(); 				// now to reset the trainStepLoop
+			betaInTraining = betaUpdated.clone(); 					// now to reset the trainStepLoop
 		}
 		
-		if (timeStep < maxSteps) {
-			System.out.println("You reached your destination after " + timeStep + " steps. Congrats.");
-		} else {
-			System.out.println("You used the given computing contingent at " + maxSteps + " steps.");
+		// printing explanation
+		if(tellMeWhatIsHappening) {
+			if (timeStep < maxSteps) {
+				System.out.println("You reached your destination after " + timeStep + " steps. Congrats.");
+			} else {
+				System.out.println("You used the given computing contingent at " + maxSteps + " steps.");
+			}
 		} 
 		return betaUpdated;
 	}
@@ -681,7 +674,7 @@ public class MyLasso {
 	}
 	
 	/**
-	 * @return residual array
+	 * @return residuals as double array
 	 */
 	public double[] getResiduals() {
 		return residual;
@@ -716,11 +709,7 @@ public class MyLasso {
 	 * @return returns the predicted value
 	 */
 	public double predictRetransformed(double[] x) {
-		double yhat = 0;
-		for (int j=0; j<dimensionality; j++) {
-			yhat += beta[j] * x[j];
-		}
-		//yhat = Utilities.mult(x, beta);
+		double yhat = Utilities.mult(x, beta);
 		return yhat*scaleOfTheResponse + centerOfTheResponse;
 	}
 	
@@ -760,11 +749,7 @@ public class MyLasso {
 	 * @return returns the predicted value
 	 */
 	public double predict(double[] x, double[] beta) {
-		double yhat = 0;
-		for (int j=0; j<dimensionality; j++) {
-			yhat += beta[j] * x[j];
-		}
-		return yhat;
+		return Utilities.mult(x, beta);
 	}
 	
 	/**
@@ -773,8 +758,7 @@ public class MyLasso {
 	 * @return returns the predicted value
 	 */
 	public double predict(double[] x) {
-		double[] betaTemp = this.beta.clone();
-		return predict(x, betaTemp);
+		return predict(x, beta);
 	}
 
 	/**
