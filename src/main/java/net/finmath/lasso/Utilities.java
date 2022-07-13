@@ -3,6 +3,8 @@
  */
 package net.finmath.lasso;
 
+import java.util.Random;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
@@ -111,4 +113,25 @@ public class Utilities {
 	public static double[] subArray(final double[] array, int startIndexInclusive, int endIndexExclusive) {
 		return ArrayUtils.subarray(array, startIndexInclusive, endIndexExclusive);
 	}
+	
+	/**
+	 * 
+	 * @param array
+	 * @param startIndexInclusive
+	 * @param endIndexExclusive
+	 * @return subArray 
+	 */
+	public static <T> T[] subArray(final T[] array, int startIndexInclusive, int endIndexExclusive) {
+		return ArrayUtils.subarray(array, startIndexInclusive, endIndexExclusive);
+	}
+	
+	/**
+	 * 
+	 * @param array
+	 * @param random
+	 */
+	public static void shuffle(final Object[] array, final Random random) {
+		ArrayUtils.shuffle(array, random);
+	}
+	
 }
