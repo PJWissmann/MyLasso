@@ -73,12 +73,12 @@ public class MyLasso {
 	/**
 	 * center of the response vector - derived via constructor
 	 */
-	public double centerOfTheResponse;
+	public double centerOfTheResponse = 0;
 	
 	/**
 	 * scaling factor of the response - derived via constructor
 	 */
-	public double scaleOfTheResponse;
+	public double scaleOfTheResponse = 1;
 	
 	/**
 	 * saves the center vector of the features in the design matrix - derived via constructor if featureCentering is true
@@ -149,12 +149,18 @@ public class MyLasso {
 
         
         // response operations
-        this.centerOfTheResponse = findCenter(response); 				// set the center of the response vector
-        this.scaleOfTheResponse = findStandardizationFactor(response); 	// set the scale factor of the response vector
         this.centeredScaledResponse = new double[numberOfObservations];
-        for (int i=0; i<numberOfObservations; i++) { 					// set centered and scaled response vector
-        	centeredScaledResponse[i] = (response[i] - centerOfTheResponse) / scaleOfTheResponse;
+        for (int i=0; i<numberOfObservations; i++) {
+        	centeredScaledResponse[i] = response[i];
         }
+//        this.centerOfTheResponse = findCenter(response); 				// set the center of the response vector
+//        for (int i=0; i<numberOfObservations; i++) { 					// set centered response vector
+//        	centeredScaledResponse[i] = centeredScaledResponse[i] - centerOfTheResponse;
+//        }
+//        this.scaleOfTheResponse = findStandardizationFactor(centeredScaledResponse); 	// set the scale factor of the response vector
+//        for (int i=0; i<numberOfObservations; i++) { 					// set centered and scaled response vector
+//        	centeredScaledResponse[i] = centeredScaledResponse[i] / scaleOfTheResponse;
+//        }
         
         
         // design matrix operations - flexible if the input is the design matrix or just the predictor matrix - flexible if it should be centered and/or standardized
@@ -372,7 +378,7 @@ public class MyLasso {
     	
     	// printing explanation
         if (tellMeWhatIsHappening) {
-        	System.out.print("The results of the " + K + "-fold cross validation within the preset lambda grid are:");
+        	System.out.println("The results of the " + K + "-fold cross validation within the preset lambda grid are:");
         	for (int l=0; l<lambdaGrid.length; l++) {
         		System.out.println("Lambda = " + lambdaGrid[l] + " has cumulative loss of " + tempError[l] +".");
         	}
@@ -405,19 +411,19 @@ public class MyLasso {
 		
 		// printing explanation
 		if(tellMeWhatIsHappening) System.out.println("Training via batch gradient descent in progress. Please wait...");
+		if(tellMeWhatIsHappening) System.out.println(m +" "+n+" "+timeStep);
 		
 		// first calculate the residuals
 		trainStepLoop:
 		for (; timeStep <maxSteps; timeStep++) { 																		// loop over steps																				
-			residualInTraining = Utilities.subtract(response, Utilities.mult(designMatrix, betaInTraining));					// compute residuals
-			
+			residualInTraining = Utilities.subtract(response, Utilities.mult(designMatrix, betaInTraining));				// compute residuals
 			for (int j=0; j<n; j++) { 																						// loop over beta updates	
-				double gradient;
-				if (j==0) {gradient = 0.0;} else if (betaInTraining[j]<0) {gradient = lambda;} else {gradient = - lambda;}; 	// compute gradient
+				double gradient;																							// compute gradient for each beta
+				if (j==0) {gradient = 0.0;} else if (betaInTraining[j]<0) {gradient = lambda;} else {gradient = - lambda;}	
 				for (int i=0; i<m; i++) { 
-					gradient += residualInTraining[i] * designMatrix[i][j];
+					gradient += residualInTraining[i] * designMatrix[i][j] / m;
 				}
-				betaUpdated[j] = betaInTraining[j] + learningRate * gradient / m;												// (sub-)gradient step
+				betaUpdated[j] = betaInTraining[j] + learningRate * gradient;												// (sub-)gradient step
 			}
 
 			checkMovementLoop:
@@ -486,9 +492,9 @@ public class MyLasso {
 				if (j==0) { 									
 					double interceptDerivative = 0; 												// negative sum of the residuals		
 					for (int i=0; i<m; i++) { //
-						interceptDerivative -= residualInTraining[i];
+						interceptDerivative -= residualInTraining[i] / m;
 					}
-					betaUpdated[0] = betaInTraining[0] - learningRate / m * interceptDerivative; 	// update formula for intercept
+					betaUpdated[0] = betaInTraining[0] - learningRate * interceptDerivative; 	// update formula for intercept
 					for (int i=0; i<m; i++) { 					
 						residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);				// update the residuals
 					}
@@ -496,7 +502,7 @@ public class MyLasso {
 				else {
 					double betajOLSDerivative = 0; 													// negative sum of the residuals times the X_(.j)	
 					for (int i=0; i<m; i++) { //
-						betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j];
+						betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j] / m;
 					}
 					betaUpdated[j] = Math.min(0, betaInTraining[j] - (betajOLSDerivative - lambda)/ squaredSumOfJPredictors[j]) + 		// update formula for non-intercept
 							Math.max(0, betaInTraining[j] - (betajOLSDerivative + lambda)/ squaredSumOfJPredictors[j]);
@@ -572,7 +578,7 @@ public class MyLasso {
 			// overhead to find the steepest derivative
 			double interceptDerivative = 0; 						// first let's look at the intercept derivative
 			for (int i=0; i<m; i++) { //
-				interceptDerivative -= residualInTraining[i];
+				interceptDerivative -= residualInTraining[i] / m;
 			}
 			double steepDerivative = interceptDerivative; 			// this value remembers the steepest descent, we initialize it with the intercept derivative
 			int steepCoeff = 0; 									// this is the coefficient that identifies the steepest descent
@@ -580,7 +586,7 @@ public class MyLasso {
 			for (int j=1; j<n; j++) { 								// search for the steepest descent - we start at j=1 because we already computed the intercept thingy
 				double betajOLSDerivative = 0; 						// let's compute the derivative to compare
 				for (int i=0; i<m; i++) { //
-					betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j];
+					betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j] / m;
 				}
 				
 				double forwardDerivative = betajOLSDerivative;
@@ -612,7 +618,7 @@ public class MyLasso {
 			
 			// update step
 			if (steepCoeff == 0) { 									// update the intercept
-				betaUpdated[0] = betaInTraining[0] - steepDerivative / m; 	
+				betaUpdated[0] = betaInTraining[0] - steepDerivative ; 	
 				for (int i=0; i<m; i++) { 							// update the residuals
 					residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);
 				}
@@ -782,7 +788,7 @@ public class MyLasso {
 		}
 		double lossValue = lambda*betaSum;
 		for (int i=0; i<response.length; i++) {
-			lossValue += Math.pow(response[i] - predict(designMatrix[i], beta),2);
+			lossValue += Math.pow(response[i] - predict(designMatrix[i],beta),2) / response.length;
 		}
 		return lossValue;
 	}
@@ -844,9 +850,9 @@ public class MyLasso {
     }  
     
     /**
-     * method to find the mean squared sum of a given vector via Kahan summation
+     * method to find the standardization factor of a given vector via Kahan summation
      * @param originalVector
-     * @return sum(originalVector)^2 / originalVector.length
+     * @return sample standard deviation
      */
     private static double findStandardizationFactor(double[] originalVector) {
     	double theTheoreticalSum = 0.0;
@@ -857,6 +863,6 @@ public class MyLasso {
 			error = (newSum - theTheoreticalSum) - value;
 			theTheoreticalSum = newSum;
 		}
-		return Math.sqrt(theTheoreticalSum) / originalVector.length;
+		return Math.sqrt(theTheoreticalSum / (originalVector.length - 1));
     }	
 }
