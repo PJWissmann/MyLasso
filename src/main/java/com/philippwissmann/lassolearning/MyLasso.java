@@ -131,7 +131,7 @@ public class MyLasso {
      * @param response is the response vector of the data set.
      */
     public MyLasso(double[][] predictor, double[] response) {
-        this(predictor, response, true, true);
+        this(predictor, response, false, true, true);
     }
 
     /**
@@ -141,7 +141,7 @@ public class MyLasso {
      * @param featureCentering is the boolean to center the predictor.
      * @param featureStandardization is the boolean to standardize the predictor.
      */
-    public MyLasso(double[][] predictor, double[] response, boolean featureCentering, boolean featureStandardization) {
+    public MyLasso(double[][] predictor, double[] response, boolean responseCenteringAndStandardization, boolean featureCentering, boolean featureStandardization) {
     	
     	this.dimensionality = predictor[0].length; 						// derive dimensionality
         this.numberOfObservations = response.length; 					// derive number of observations
@@ -153,15 +153,16 @@ public class MyLasso {
         for (int i=0; i<numberOfObservations; i++) {
         	centeredScaledResponse[i] = response[i];
         }
-//        this.centerOfTheResponse = findCenter(response); 				// set the center of the response vector
-//        for (int i=0; i<numberOfObservations; i++) { 					// set centered response vector
-//        	centeredScaledResponse[i] = centeredScaledResponse[i] - centerOfTheResponse;
-//        }
-//        this.scaleOfTheResponse = findStandardizationFactor(centeredScaledResponse); 	// set the scale factor of the response vector
-//        for (int i=0; i<numberOfObservations; i++) { 					// set centered and scaled response vector
-//        	centeredScaledResponse[i] = centeredScaledResponse[i] / scaleOfTheResponse;
-//        }
-        
+        if (responseCenteringAndStandardization) {
+        	this.centerOfTheResponse = findCenter(response); 				// set the center of the response vector
+        	for (int i=0; i<numberOfObservations; i++) { 					// set centered response vector
+        		centeredScaledResponse[i] = centeredScaledResponse[i] - centerOfTheResponse;
+        	}
+        	this.scaleOfTheResponse = findStandardizationFactor(centeredScaledResponse); 	// set the scale factor of the response vector
+        	for (int i=0; i<numberOfObservations; i++) { 					// set centered and scaled response vector
+        		centeredScaledResponse[i] = centeredScaledResponse[i] / scaleOfTheResponse;
+        	}
+        }
         
         // design matrix operations - flexible if the input is the design matrix or just the predictor matrix - flexible if it should be centered and/or standardized
         predictorOrDesignMatrixloop:
