@@ -150,7 +150,7 @@ public class MyLasso {
         
         // response operations
         this.centeredScaledResponse = new double[numberOfObservations];
-        for (int i=0; i<numberOfObservations; i++) {
+        for (int i=0; i<numberOfObservations; i++) {												// substitute with centeredScaledResponse = response.clone()
         	centeredScaledResponse[i] = response[i];
         }
         if (responseCenteringAndStandardization) {
@@ -223,7 +223,9 @@ public class MyLasso {
         // printing explanation
         if (tellMeWhatIsHappening) {
         	System.out.println("Variable dimensionality was set to "+ predictor[0].length + ", numberOfObservations to " + response.length +".");
-        	System.out.println("Vector response was centered at " + centerOfTheResponse + " and standardized with factor " + scaleOfTheResponse +".");
+        	if (responseCenteringAndStandardization) {
+        		System.out.println("Vector response was centered at " + centerOfTheResponse + " and standardized with factor " + scaleOfTheResponse +".");
+        	}
         	System.out.println("Matrix predictor was transformed into a design matrix if it was not already one.");
         	if (featureCentering) {				System.out.println("Also the design matrix was centered - which also removes the 1-column property of the design matrix.");		}
         	if (featureStandardization) {		System.out.println("Also the design matrix was standardized - Lasso penalizes coefficients more equally.");		}
@@ -317,7 +319,7 @@ public class MyLasso {
     	
     	// shuffling indexList with Collections.shuffle() to randomly assign each observation to one of the K splits
     	List<Integer> indexList = new ArrayList<>(numberOfObservations);
-    	for (int i=0; i<numberOfObservations; i++) indexList.add(i%K);
+    	for (int i=0; i<numberOfObservations; i++) indexList.add(i%K);							
     	Collections.shuffle(indexList, rng);
     	int[] indexArrayShuffled = indexList.stream().mapToInt(Integer::intValue).toArray();
     	
@@ -477,7 +479,7 @@ public class MyLasso {
 		// printing explanation
 		if(tellMeWhatIsHappening) System.out.println("Training via cyclic coordinate descent in progress. Please wait...");
 		
-		for (int i=0; i<m; i++) { 								// compute the start residuals
+		for (int i=0; i<m; i++) { 								// compute the start residuals							// substitute with residualInTraining = response.clone()
 			residualInTraining[i] = response[i];
 		}
 		for (int j=1; j<n; j++) { 								// compute the squardSumOfPredictors - note that we ignore j=0 since the intercept has another update formula
@@ -564,7 +566,7 @@ public class MyLasso {
 		// printing explanation
 		if(tellMeWhatIsHappening) System.out.println("Training via greedy coordinate descent in progress. Please wait...");
 		
-		for (int i=0; i<m; i++) { 								// compute the start residuals
+		for (int i=0; i<m; i++) { 								// compute the start residuals					// substitute with centeredScaledResponse = response.clone()
 			residualInTraining[i] = response[i];
 		}
 		for (int j=1; j<n; j++) { 								// compute the squaredSumOfPredictors - note this is only relevant if the data is not standardized, otherwise equal 1
