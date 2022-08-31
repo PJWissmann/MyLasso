@@ -28,6 +28,7 @@ public class CovidDataDemo {
 
 		String countryName;
 		List<Double> values = new ArrayList<>();
+		List<LocalDate> dateList = new ArrayList<>();
 
 		try {
 			List<List<String>> table = Utilities.readCSVTableWithHeaders("C:\\Users\\phili\\eclipse-workspace\\CovidData.csv");
@@ -39,13 +40,14 @@ public class CovidDataDemo {
 				List<String> row = table.get(rowIndex);
 
 				LocalDate date = LocalDate.parse(row.get(0), DateTimeFormatter.ISO_LOCAL_DATE);
+				dateList.add(date);
 
 				Double value = Double.parseDouble(row.get(country));
 				values.add(value);
 
-				System.out.println("Read " + date);
+//				System.out.println("Read " + date);
 			}
-			System.out.println();
+			System.out.println("Completed reading all dates.");
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
@@ -76,11 +78,11 @@ public class CovidDataDemo {
 			growthRates.add(Math.log(runningSums.get(i)/runningSums.get(i-periodLength))/periodLength);
 		}
 		
-		Plots.createScatter(days, growthRates, 7, days.size()+7, 3)
-		.setTitle("Covid Growth Rate for " + countryName)
-		.setXAxisLabel("day")
-		.setYAxisLabel("log growth rate")
-		.show();
+//		Plots.createScatter(days, growthRates, 7, days.size()+7, 3)
+//		.setTitle("Covid Growth Rate for " + countryName)
+//		.setXAxisLabel("day")
+//		.setYAxisLabel("log growth rate")
+//		.show();
 		
 		// create the array based data set we want to use lasso on
 		double[] growthRatesAsResponse = new double[growthRates.size()];
@@ -88,7 +90,7 @@ public class CovidDataDemo {
 		
 		for (int i = 0; i < growthRates.size(); i++) {
 			growthRatesAsResponse[i] = growthRates.get(i);
-			for (int j = 0; j < growthRates.size(); j++) {
+			for (int j = 0; j < piecewiseConstAsBasisFct[0].length; j++) {
 				if (i>=j) {
 					piecewiseConstAsBasisFct[i][j] = 1.0; // the growthRate values could be an option to use?
 				} else {
@@ -96,15 +98,27 @@ public class CovidDataDemo {
 				}
 			}
 		}
+	
 		
-		MyLasso lassoCovid = new MyLasso(piecewiseConstAsBasisFct, growthRatesAsResponse, false, false, false);
+		MyLasso lassoCovid = new MyLasso(piecewiseConstAsBasisFct, growthRatesAsResponse, true, false, false);
 		
-		lassoCovid.setLambda(0.0);
+//		lassoCovid.setLambdaWithCV(3141, 5, 1);
+		lassoCovid.setLambda(0.15);
 		lassoCovid.setMaxSteps(10000);
-		lassoCovid.setTolerance(0.0);
+		lassoCovid.setTolerance(0.00001);
 		lassoCovid.setLearningRate(0.1);
 		
+		lassoCovid.trainCycleCoord();
 		
+		double[] resultBeta = new double[piecewiseConstAsBasisFct[0].length];
+		resultBeta = lassoCovid.getBeta();
+		
+		System.out.println("Centered at beta_0: " + resultBeta[0]);
+		for (int j=1; j<piecewiseConstAsBasisFct[0].length; j++) { // carefull with uncentered response beta0 takes the center value
+			if (resultBeta[j] != 0.0) {
+				System.out.println("Tag " + j + " - " + dateList.get(j-1) + ": " + resultBeta[j]);
+			}
+		}
 		
 	}
 }
