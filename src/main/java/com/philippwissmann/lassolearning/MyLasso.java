@@ -53,16 +53,28 @@ public class MyLasso {
 	public double[][] designMatrix;
 	
 	/**
-	 * boolean if the features are centered - can be chosen in the constructor
+	 * boolean if the response gets centered and scaled - can be chosen in the constructor
 	 * usually true so the lasso penalizes not the intercept
 	 */
-	public boolean featureCentering = true;
+	public boolean responseCenteringAndStandardization;
 	
 	/**
-	 * boolean if the features are standardized - can be chosen in the constructor
+	 * boolean if the features gets centered - can be chosen in the constructor
+	 * usually true so the lasso penalizes not the intercept
+	 */
+	public boolean featureCentering;
+	
+	/**
+	 * boolean if the features gets standardized - can be chosen in the constructor
 	 * usually true so the lasso penalty hits predictors independent of their "scale"
 	 */
-	public boolean featureStandardization = true;
+	public boolean featureStandardization;
+	
+	/**
+	 * boolean if the input data is already a design matrix - derived via constructor
+	 * is responsible to add a "1"-column to the predictor matrix if false
+	 */
+    private boolean isAlreadyTheDesignMatrix;
 	
 	// dimensionality of the predictors - derived via constructor
 	private int dimensionality;
@@ -90,11 +102,7 @@ public class MyLasso {
 	 */
 	public double[] scalingVectorOfTheDesignMatrix;
 	
-	/**
-	 * boolean if the input data is already a design matrix - derived via constructor
-	 * is responsible to add a "1"-column to the predictor matrix if false
-	 */
-    private boolean isAlreadyTheDesignMatrix = true;
+ 
 	
     
     
@@ -131,7 +139,7 @@ public class MyLasso {
      * @param response is the response vector of the data set.
      */
     public MyLasso(double[][] predictor, double[] response) {
-        this(predictor, response, false, true, true);
+        this(predictor, response, false, true, true, false);
     }
 
     /**
@@ -141,10 +149,14 @@ public class MyLasso {
      * @param featureCentering is the boolean to center the predictor.
      * @param featureStandardization is the boolean to standardize the predictor.
      */
-    public MyLasso(double[][] predictor, double[] response, boolean responseCenteringAndStandardization, boolean featureCentering, boolean featureStandardization) {
+    public MyLasso(double[][] predictor, double[] response, boolean responseCenteringAndStandardization, boolean featureCentering, boolean featureStandardization, boolean isAlreadyTheDesignMatrix) {
     	
     	this.dimensionality = predictor[0].length; 						// derive dimensionality
         this.numberOfObservations = response.length; 					// derive number of observations
+        this.responseCenteringAndStandardization = responseCenteringAndStandardization;
+        this.featureCentering = featureCentering;
+        this.featureStandardization = featureStandardization;
+        this.isAlreadyTheDesignMatrix = isAlreadyTheDesignMatrix;
 
 
         
@@ -164,14 +176,7 @@ public class MyLasso {
         	}
         }
         
-        // design matrix operations - flexible if the input is the design matrix or just the predictor matrix - flexible if it should be centered and/or standardized
-        predictorOrDesignMatrixloop:
-        for (int i=0; i<numberOfObservations; i++) { 					// if the 0-th feature of the predictor is 1 for all obs., we assume it's a design matrix
-        	if (predictor[i][0] != 1) {
-        		this.isAlreadyTheDesignMatrix = false;
-        		break predictorOrDesignMatrixloop;
-        	}
-        }
+        // design matrix operations - flexible if it should be centered and/or standardized
         if (this.isAlreadyTheDesignMatrix) {
         	this.designMatrix = new double[numberOfObservations][dimensionality];
         	for (int i=0; i<numberOfObservations; i++) { 				
@@ -189,6 +194,7 @@ public class MyLasso {
 				}
         	}
         }
+
         if (this.featureCentering) { 									// if featureCentering is true, then we center the feature vectors
         	this.centerVectorOfTheDesignMatrix = new double[dimensionality];
         	for (int j=1; j<dimensionality; j++) {
@@ -479,7 +485,7 @@ public class MyLasso {
 		// printing explanation
 		if(tellMeWhatIsHappening) System.out.println("Training via cyclic coordinate descent in progress. Please wait...");
 		
-		for (int i=0; i<m; i++) { 								// compute the start residuals							// substitute with residualInTraining = response.clone()
+		for (int i=0; i<m; i++) { 								// compute the start residuals	R = y - beta_0						// substitute with residualInTraining = response.clone()
 			residualInTraining[i] = response[i];
 		}
 		for (int j=1; j<n; j++) { 								// compute the squardSumOfPredictors - note that we ignore j=0 since the intercept has another update formula
@@ -495,20 +501,22 @@ public class MyLasso {
 				if (j==0) { 									
 					double interceptDerivative = 0; 												// negative sum of the residuals		
 					for (int i=0; i<m; i++) { //
-						interceptDerivative -= residualInTraining[i] / m;
+						interceptDerivative -= residualInTraining[i] ;	// g = - sum of R_i
 					}
-					betaUpdated[0] = betaInTraining[0] - learningRate * interceptDerivative; 	// update formula for intercept
-					for (int i=0; i<m; i++) { 					
+					betaUpdated[0] = betaInTraining[0] - /*learningRate */ interceptDerivative / m; 	// update formula for intercept
+					
+					for (int i=0; i<m; i++) { 					// R_i = R_i + beta_old - beta_new
 						residualInTraining[i] += (betaInTraining[0]  - betaUpdated[0]);				// update the residuals
 					}
 				}
 				else {
 					double betajOLSDerivative = 0; 													// negative sum of the residuals times the X_(.j)	
 					for (int i=0; i<m; i++) { //
-						betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j] / m;
+						betajOLSDerivative -= residualInTraining[i] * designMatrix[i][j]; 
 					}
-					betaUpdated[j] = Math.min(0, betaInTraining[j] - (betajOLSDerivative - lambda)/ squaredSumOfJPredictors[j]) + 		// update formula for non-intercept
-							Math.max(0, betaInTraining[j] - (betajOLSDerivative + lambda)/ squaredSumOfJPredictors[j]);
+
+					betaUpdated[j] = Math.min(0, betaInTraining[j] - (betajOLSDerivative/m - lambda)/ squaredSumOfJPredictors[j]) + 		// update formula for non-intercept
+							Math.max(0, betaInTraining[j] - (betajOLSDerivative/m + lambda)/ squaredSumOfJPredictors[j]);
 					for (int i=0; i<m; i++) { 					
 						residualInTraining[i] += designMatrix[i][j] * (betaInTraining[j]  - betaUpdated[j]);							// update the residuals
 					}
@@ -794,6 +802,33 @@ public class MyLasso {
 			lossValue += Math.pow(response[i] - predict(designMatrix[i],beta),2) / response.length;
 		}
 		return lossValue;
+	}
+	
+	/**
+	 * Function to print response entries.
+	 * @param start index to start printing (inclusive)
+	 * @param end index to stop printing (exclusive)
+	 */
+	public void showMeResponse(int start, int end) {
+		for (int i=start; i<end; i++) {
+			System.out.println(centeredScaledResponse[i]);
+		}
+	}
+	
+	/**
+	 * Function to print designMatrix entries.
+	 * @param startObs row index to start printing (inclusive)
+	 * @param endObs row index to stop printing (exclusive)
+	 * @param startJ column index to start printing (inclusive)
+	 * @param endJ column index to stop printing (exclusive)
+	 */
+	public void showMeDesignMatrix(int startObs, int endObs, int startJ, int endJ) {
+		for (int i=startObs; i<endObs; i++) {
+			for (int j=startJ; j<endJ; j++) {
+				System.out.print(String.format("%.4f", designMatrix[i][j])+" ");
+			}
+			System.out.println();
+		}
 	}
 	
 	/* ---------- wrapper classes around the algorithms that show the computation time and update the residual with the new model ---------- */
