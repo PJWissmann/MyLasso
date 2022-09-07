@@ -94,41 +94,41 @@ public class CovidDataDemo {
 		
 		for (int i = 0; i < growthRates.size(); i++) {
 			growthRatesAsResponse[i] = growthRates.get(i);
-//			if (i<10||i>(growthRates.size()-10)) {System.out.print(growthRatesAsResponse[i] + " ");}
 			for (int j = 0; j < piecewiseConstAsBasisFct[0].length; j++) {
 				if (i>=j) {
-					piecewiseConstAsBasisFct[i][j] = 1.0; // the growthRate values could be an option to use?
+					piecewiseConstAsBasisFct[i][j] = 1.0; 
 				} else {
 					piecewiseConstAsBasisFct[i][j] = 0.0;
 				}
-//				if (i<10||i>(growthRates.size()-10)) {System.out.print(piecewiseConstAsBasisFct[i][j]+" ");}
 			}
-//			if (i<10||i>(growthRates.size()-10)) {System.out.println();}
 		}
 
-		MyLasso lassoCovid = new MyLasso(piecewiseConstAsBasisFct, growthRatesAsResponse, false, true, true, true);
+		MyLasso lassoCovid = new MyLasso(piecewiseConstAsBasisFct, growthRatesAsResponse, false, false, false, true);
 		
-//		lassoCovid.setLambdaWithCV(3141, 5, 1);
-//		lassoCovid.setLambda(0.17); // if centered and scaled response 0.15 to 0.17 gives interesting results
-		lassoCovid.setLambda(0.006); // if raw response 0.006 gives interesting results
-		lassoCovid.setMaxSteps(100);
-		lassoCovid.setTolerance(0.0);
+		lassoCovid.setLambda(0.0027); // 
+		lassoCovid.setMaxSteps(10000);
+		lassoCovid.setTolerance(0.000000001);
 		lassoCovid.setLearningRate(1);
+//		lassoCovid.showMeResponse(0, 2); // check the response vector
+//		lassoCovid.showMeDesignMatrix(0, 2, 0, 2); // check the design matrix
 		
-		lassoCovid.trainCycleCoord();
+		lassoCovid.trainCycleCoord();		
 		
-		double[] resultBeta = new double[piecewiseConstAsBasisFct[0].length];
-		resultBeta = lassoCovid.getBeta();
-		
-		System.out.println("Centered at beta_0: " + resultBeta[0]);
-		lassoCovid.showMeResponse(0, 2);
-		lassoCovid.showMeDesignMatrix(0, 5, 0, 5);
-		for (int j=1; j<piecewiseConstAsBasisFct[0].length; j++) { // carefull with uncentered response beta0 takes the center value
-			if (resultBeta[j] != 0.0) {
-				System.out.println("Tag " + j + " - " + dateList.get(j-1) + ": " + String.format("%.14f", resultBeta[j]));
+		System.out.println("Centered at beta_0: " + lassoCovid.getSpecificBeta(0));
+
+		for (int j=1; j<piecewiseConstAsBasisFct[0].length; j++) { // sparse printing
+			if (lassoCovid.getSpecificBeta(j) != 0.0) {
+				System.out.println("Tag " + j + " - " + dateList.get(j+21) + ": " + lassoCovid.getSpecificBeta(j));
 			}
 		}
-		
+		double squaredError = 0.0;
+		for (int i=0; i<800; i++) {
+			double temp = lassoCovid.predict(i);
+			double tempError = (growthRatesAsResponse[i]-temp);
+			squaredError += tempError * tempError;
+//			System.out.println("actual " + growthRatesAsResponse[i] +" vs predicted " + temp + " with error " + tempError);
+		}
+		System.out.println("For comparison to the sklearn algorithm we computed the squared error: "+squaredError);
 	}
 }
 

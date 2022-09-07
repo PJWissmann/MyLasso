@@ -901,6 +901,9 @@ public class MyLasso {
 			error = (newSum - theTheoreticalSum) - value;
 			theTheoreticalSum = newSum;
 		}
-		return Math.sqrt(theTheoreticalSum / (originalVector.length - 1));
+		return Math.sqrt(theTheoreticalSum / (originalVector.length ));
     }	
 }
+
+
+
