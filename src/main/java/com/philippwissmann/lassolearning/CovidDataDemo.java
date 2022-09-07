@@ -52,6 +52,7 @@ public class CovidDataDemo {
 			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
+//		System.out.println(values.size());
 
 		/**
 		 * Calculate running sum over 7 days.
@@ -67,6 +68,7 @@ public class CovidDataDemo {
 			runningSum += values.get(i)-values.get(i-7);
 			runningSums.add(runningSum);
 		}
+//		System.out.println(runningSums.size());
 
 		/**
 		 * Calculate grows rate
@@ -77,6 +79,8 @@ public class CovidDataDemo {
 			days.add((double)i);
 			growthRates.add(Math.log(runningSums.get(i)/runningSums.get(i-periodLength))/periodLength);
 		}
+//		System.out.println(growthRates.size());
+		
 		
 //		Plots.createScatter(days, growthRates, 7, days.size()+7, 3)
 //		.setTitle("Covid Growth Rate for " + countryName)
@@ -90,23 +94,26 @@ public class CovidDataDemo {
 		
 		for (int i = 0; i < growthRates.size(); i++) {
 			growthRatesAsResponse[i] = growthRates.get(i);
+//			if (i<10||i>(growthRates.size()-10)) {System.out.print(growthRatesAsResponse[i] + " ");}
 			for (int j = 0; j < piecewiseConstAsBasisFct[0].length; j++) {
 				if (i>=j) {
 					piecewiseConstAsBasisFct[i][j] = 1.0; // the growthRate values could be an option to use?
 				} else {
 					piecewiseConstAsBasisFct[i][j] = 0.0;
 				}
+//				if (i<10||i>(growthRates.size()-10)) {System.out.print(piecewiseConstAsBasisFct[i][j]+" ");}
 			}
+//			if (i<10||i>(growthRates.size()-10)) {System.out.println();}
 		}
-	
-		
-		MyLasso lassoCovid = new MyLasso(piecewiseConstAsBasisFct, growthRatesAsResponse, true, false, false);
+
+		MyLasso lassoCovid = new MyLasso(piecewiseConstAsBasisFct, growthRatesAsResponse, false, true, true, true);
 		
 //		lassoCovid.setLambdaWithCV(3141, 5, 1);
-		lassoCovid.setLambda(0.15);
-		lassoCovid.setMaxSteps(10000);
-		lassoCovid.setTolerance(0.00001);
-		lassoCovid.setLearningRate(0.1);
+//		lassoCovid.setLambda(0.17); // if centered and scaled response 0.15 to 0.17 gives interesting results
+		lassoCovid.setLambda(0.006); // if raw response 0.006 gives interesting results
+		lassoCovid.setMaxSteps(100);
+		lassoCovid.setTolerance(0.0);
+		lassoCovid.setLearningRate(1);
 		
 		lassoCovid.trainCycleCoord();
 		
@@ -114,9 +121,11 @@ public class CovidDataDemo {
 		resultBeta = lassoCovid.getBeta();
 		
 		System.out.println("Centered at beta_0: " + resultBeta[0]);
+		lassoCovid.showMeResponse(0, 2);
+		lassoCovid.showMeDesignMatrix(0, 5, 0, 5);
 		for (int j=1; j<piecewiseConstAsBasisFct[0].length; j++) { // carefull with uncentered response beta0 takes the center value
 			if (resultBeta[j] != 0.0) {
-				System.out.println("Tag " + j + " - " + dateList.get(j-1) + ": " + resultBeta[j]);
+				System.out.println("Tag " + j + " - " + dateList.get(j-1) + ": " + String.format("%.14f", resultBeta[j]));
 			}
 		}
 		

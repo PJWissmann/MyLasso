@@ -61,7 +61,7 @@ public class BostonHousingDemo {
 		
 		
 		// --------------------------------- construct the class on top of the data ---------------------------------
-		MyLasso bostonLasso = new MyLasso(bostonPredictor, bostonResponse, false, true, true); 
+		MyLasso bostonLasso = new MyLasso(bostonPredictor, bostonResponse, false, true, true, false); 
 		
 		
 		// --------------------------------- set training relevant parameters for an OLS solution (if we don't want to use the preset ones) ---------------------------------
