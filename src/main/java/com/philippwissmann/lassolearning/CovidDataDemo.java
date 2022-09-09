@@ -105,14 +105,14 @@ public class CovidDataDemo {
 
 		MyLasso lassoCovid = new MyLasso(piecewiseConstAsBasisFct, growthRatesAsResponse, false, false, false, true);
 		
-		lassoCovid.setLambda(0.0027); // 
+		lassoCovid.setLambda(0.0025); // 
 		lassoCovid.setMaxSteps(10000);
 		lassoCovid.setTolerance(0.000000001);
 		lassoCovid.setLearningRate(1);
 //		lassoCovid.showMeResponse(0, 2); // check the response vector
 //		lassoCovid.showMeDesignMatrix(0, 2, 0, 2); // check the design matrix
 		
-		lassoCovid.trainCycleCoord();		
+		lassoCovid.trainGreedyCoord();		
 		
 		System.out.println("Centered at beta_0: " + lassoCovid.getSpecificBeta(0));
 
